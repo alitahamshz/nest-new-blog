@@ -1,5 +1,6 @@
 // src/categories/category.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, Tree, TreeChildren, TreeParent } from 'typeorm';
+import { Post } from 'src/posts/entities/post.entity';
+import { Entity, PrimaryGeneratedColumn, Column, Tree, TreeChildren, TreeParent, OneToMany } from 'typeorm';
 
 @Entity('category')
 @Tree('closure-table')
@@ -20,4 +21,9 @@ export class Category {
   // دسته والد
   @TreeParent()
   parent: Category;
+
+    // 🟢 one-to-many with posts
+  @OneToMany(() => Post, (post) => post.category)
+  posts: Post[];
 }
+

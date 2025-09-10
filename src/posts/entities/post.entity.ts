@@ -1,5 +1,7 @@
 // src/posts/post.entity.ts
+import { Category } from 'src/category/entities/category.entity';
 import { Tag } from 'src/tags/entities/tag.entity';
+import { User } from 'src/users/entities/user.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,6 +10,7 @@ import {
   UpdateDateColumn,
   ManyToMany,
   JoinTable,
+  ManyToOne,
 } from 'typeorm';
 
 export enum PostStatus {
@@ -46,7 +49,7 @@ export class Post {
   content: string;
 
   // تگ‌ها (رشته‌ای از کلمات کلیدی جدا شده با ویرگول)
-  @Column('simple-array', { nullable: true })
+  @Column('text', { array: true, nullable: true })
   inner_tags: string[];
 
   @ManyToMany(() => Tag, (tag) => tag.posts, { cascade: true })
@@ -56,9 +59,16 @@ export class Post {
     inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
   })
   tags: Tag[];
-  // دسته‌بندی (فعلاً رشته، بعداً میشه رابطه جداگانه درست کرد)
-  @Column({ nullable: true })
-  category: string;
+
+  // اضافه کردن نویسنده
+  @ManyToOne(() => User, (user) => user.posts, { eager: true })
+  author: User;
+  // 🟢 many-to-one with category
+  @ManyToOne(() => Category, (category) => category.posts, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  category: Category | null;
 
   // تصویر بندانگشتی
   @Column({ nullable: true })

@@ -1,6 +1,7 @@
 // user.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToMany } from 'typeorm';
 import { Role } from '../../roles/entities/role.entity';
+import { Post } from 'src/posts/entities/post.entity';
 
 @Entity('users')
 export class User {
@@ -19,4 +20,8 @@ export class User {
   @ManyToMany(() => Role, (role) => role.users, { eager: true })
   @JoinTable() // فقط یک سمت نیاز داره
   roles: Role[];
+
+   // ارتباط با پست‌ها
+  @OneToMany(() => Post, (post) => post.author)
+  posts: Post[];
 }

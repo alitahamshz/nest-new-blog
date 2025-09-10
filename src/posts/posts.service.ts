@@ -1,26 +1,150 @@
-import { Injectable } from '@nestjs/common';
+// src/posts/posts.service.ts
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { Post, PostStatus } from './entities/post.entity';
+import { Tag } from '../tags/entities/tag.entity';
+import { Category } from '../category/entities/category.entity';
+import { User } from '../users/entities/user.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
 @Injectable()
 export class PostsService {
-  create(createPostDto: CreatePostDto) {
-    return 'This action adds a new post';
+  constructor(
+    @InjectRepository(Post) private readonly postRepo: Repository<Post>,
+    @InjectRepository(Tag) private readonly tagRepo: Repository<Tag>,
+    @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
+
+  /**
+   * Create post.
+   * - برای فیلدهای اختیاری مقدار پیش‌فرض می‌ذاریم تا خطای تایپ پیش نیاد
+   */
+  async create(dto: CreatePostDto, authorId: number): Promise<Post> {
+    // basic checks
+    if (!dto.title || !dto.slug || !dto.content) {
+      throw new BadRequestException('title, slug and content are required');
+    }
+
+    const post = this.postRepo.create();
+
+    post.title = dto.title;
+    post.slug = dto.slug;
+    post.seoTitle = dto.seoTitle ?? '';
+    post.metaDescription = dto.metaDescription ?? '';
+    post.excerpt = dto.excerpt ?? '';
+    post.content = dto.content ?? '';
+    post.status = dto.status ?? PostStatus.DRAFT;
+
+    // tags (if provided)
+    if (dto.tags && Array.isArray(dto.tags) && dto.tags.length > 0) {
+      post.tags = await this.tagRepo.find({
+        where: { id: In(dto.tags) },
+      });
+    } else {
+      post.tags = [];
+    }
+
+    // category (if provided)
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+      if (!category) throw new NotFoundException('Category not found');
+      post.category = category;
+    } else {
+      post.category = null;
+    }
+
+    // thumbnail & coverImage (support both camelCase and snake_case from client)
+    // client ممکنه thumbnail یا thumbnail_url یا cover_image بفرسته
+    const anyDto: any = dto as any;
+    post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? '';
+    post.coverImage = anyDto.coverImage ?? anyDto.cover_image ?? '';
+
+    // author
+    const author = await this.userRepo.findOne({ where: { id: authorId } });
+    if (!author) throw new NotFoundException('Author not found');
+    post.author = author;
+
+    return this.postRepo.save(post);
   }
 
-  findAll() {
-    return `This action returns all posts`;
+  /**
+   * Update post.
+   * - فقط فیلدهایی رو که در dto ارسال شده تغییر میدیم.
+   */
+  async update(id: number, dto: UpdatePostDto): Promise<Post> {
+    const post = await this.postRepo.findOne({
+      where: { id },
+      relations: ['tags', 'category', 'author'],
+    });
+    if (!post) throw new NotFoundException('Post not found');
+
+    // update only provided fields
+    if (dto.title !== undefined) post.title = dto.title;
+    if (dto.slug !== undefined) post.slug = dto.slug;
+    if (dto.seoTitle !== undefined) post.seoTitle = dto.seoTitle;
+    if (dto.metaDescription !== undefined) post.metaDescription = dto.metaDescription;
+    if (dto.excerpt !== undefined) post.excerpt = dto.excerpt;
+    if (dto.content !== undefined) post.content = dto.content;
+    if (dto.status !== undefined) post.status = dto.status;
+
+    // tags: if dto.tags is provided (even empty array) -> update association
+    if (dto.tags !== undefined) {
+      if (Array.isArray(dto.tags) && dto.tags.length > 0) {
+        post.tags = await this.tagRepo.find({
+          where: { id: In(dto.tags) },
+        });
+      } else {
+        // empty array means remove all tags
+        post.tags = [];
+      }
+    }
+
+    // category: allow setting to null (remove category)
+    if (dto.categoryId !== undefined) {
+      if (dto.categoryId === null) {
+        post.category = null;
+      } else {
+        const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+        if (!category) throw new NotFoundException('Category not found');
+        post.category = category;
+      }
+    }
+
+    // thumbnail & coverImage
+    const anyDto: any = dto as any;
+    if (anyDto.thumbnail !== undefined || anyDto.thumbnail_url !== undefined) {
+      post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? post.thumbnail;
+    }
+    if (anyDto.coverImage !== undefined || anyDto.cover_image !== undefined) {
+      post.coverImage = anyDto.coverImage ?? anyDto.cover_image ?? post.coverImage;
+    }
+
+    return this.postRepo.save(post);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} post`;
+  async findAll(): Promise<Post[]> {
+    return this.postRepo.find({
+      relations: ['author', 'tags', 'category'],
+      order: { id: 'DESC' },
+    });
   }
 
-  update(id: number, updatePostDto: UpdatePostDto) {
-    return `This action updates a #${id} post`;
+  async findOne(id: number): Promise<Post> {
+    const post = await this.postRepo.findOne({
+      where: { id },
+      relations: ['author', 'tags', 'category'],
+    });
+    if (!post) throw new NotFoundException('Post not found');
+    return post;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} post`;
+  async remove(id: number): Promise<{ message: string }> {
+    const post = await this.postRepo.findOne({ where: { id } });
+    if (!post) throw new NotFoundException('Post not found');
+    await this.postRepo.delete(id);
+    return { message: 'Post deleted' };
   }
 }
