@@ -3,12 +3,22 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostsModule } from './posts/posts.module';
+import { CategoryModule } from './category/category.module';
+import { TagsModule } from './tags/tags.module';
+import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
+import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from '@nestjs/config';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
-     TypeOrmModule.forRoot({
+    ConfigModule.forRoot({
+      isGlobal: true, // همه‌جا در دسترس باشه
+    }),
+    TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',   // اگر داکر یا سرور داری اینو تغییر بده
+      host: 'localhost', // اگر داکر یا سرور داری اینو تغییر بده
       port: 5432,
       username: 'postgres', // یوزرنیم دیتابیس
       password: 'admin123456789', // پسورد دیتابیس
@@ -16,7 +26,14 @@ import { PostsModule } from './posts/posts.module';
       autoLoadEntities: true, // همه‌ی Entity ها رو خودکار لود میکنه
       synchronize: true, // فقط در محیط توسعه فعال باشه
     }),
-     PostsModule],
+    PostsModule,
+    CategoryModule,
+    TagsModule,
+    UsersModule,
+    RolesModule,
+    AuthModule,
+    FilesModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

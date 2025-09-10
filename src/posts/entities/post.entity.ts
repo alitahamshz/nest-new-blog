@@ -1,5 +1,14 @@
 // src/posts/post.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Tag } from 'src/tags/entities/tag.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToMany,
+  JoinTable,
+} from 'typeorm';
 
 export enum PostStatus {
   DRAFT = 'draft',
@@ -38,8 +47,15 @@ export class Post {
 
   // تگ‌ها (رشته‌ای از کلمات کلیدی جدا شده با ویرگول)
   @Column('simple-array', { nullable: true })
-  tags: string[];
+  inner_tags: string[];
 
+  @ManyToMany(() => Tag, (tag) => tag.posts, { cascade: true })
+  @JoinTable({
+    name: 'post_tags', // جدول واسط Many-to-Many
+    joinColumn: { name: 'post_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
   // دسته‌بندی (فعلاً رشته، بعداً میشه رابطه جداگانه درست کرد)
   @Column({ nullable: true })
   category: string;
