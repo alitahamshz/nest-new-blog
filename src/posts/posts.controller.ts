@@ -17,7 +17,7 @@ export class PostsController {
   @Post()
   @ApiBearerAuth('access-token')  // 👈 به Swagger میگه از توکن استفاده کن
   @UseGuards(JwtAuthGuard)
-  
+
   create(@Body() dto: CreatePostDto, @Request() req) {
     return this.postsService.create(dto, req.user.id);
   }

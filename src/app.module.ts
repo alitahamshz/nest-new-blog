@@ -10,6 +10,8 @@ import { RolesModule } from './roles/roles.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { FilesModule } from './files/files.module';
+import { CommentsModule } from './comments/comments.module';
+import { UserProfileModule } from './users/user-profile.module';
 
 @Module({
   imports: [
@@ -19,9 +21,9 @@ import { FilesModule } from './files/files.module';
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost', // اگر داکر یا سرور داری اینو تغییر بده
-      port: 5432,
+      port: 8000,
       username: 'postgres', // یوزرنیم دیتابیس
-      password: 'admin123456789', // پسورد دیتابیس
+      password: '123456789', // پسورد دیتابیس
       database: 'blog-db', // اسم دیتابیس
       autoLoadEntities: true, // همه‌ی Entity ها رو خودکار لود میکنه
       synchronize: true, // فقط در محیط توسعه فعال باشه
@@ -33,6 +35,8 @@ import { FilesModule } from './files/files.module';
     RolesModule,
     AuthModule,
     FilesModule,
+    CommentsModule,
+    UserProfileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

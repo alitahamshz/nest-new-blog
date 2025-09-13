@@ -1,5 +1,6 @@
 // src/posts/post.entity.ts
 import { Category } from 'src/category/entities/category.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
 import { Tag } from 'src/tags/entities/tag.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
@@ -11,6 +12,7 @@ import {
   ManyToMany,
   JoinTable,
   ManyToOne,
+  OneToMany,
 } from 'typeorm';
 
 export enum PostStatus {
@@ -52,6 +54,9 @@ export class Post {
   @Column('text', { array: true, nullable: true })
   inner_tags: string[];
 
+  @Column({ default: 0 })
+  viewCount: number; // تعداد بازدید
+
   @ManyToMany(() => Tag, (tag) => tag.posts, { cascade: true })
   @JoinTable({
     name: 'post_tags', // جدول واسط Many-to-Many
@@ -70,6 +75,8 @@ export class Post {
   })
   category: Category | null;
 
+  @OneToMany(() => Comment, (comment) => comment.post)
+  comments: Comment[];
   // تصویر بندانگشتی
   @Column({ nullable: true })
   thumbnail: string;
