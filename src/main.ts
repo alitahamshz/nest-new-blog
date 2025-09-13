@@ -9,7 +9,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/', // دسترسی فرانت به فایل‌ها
   });
-   const config = new DocumentBuilder()
+  const config = new DocumentBuilder()
     .setTitle('Blog API')
     .setDescription('API documentation for the Blog project')
     .setVersion('1.0')

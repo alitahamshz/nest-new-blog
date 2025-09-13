@@ -1,7 +1,17 @@
 // user.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, JoinTable, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToMany,
+  JoinTable,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 import { Role } from '../../roles/entities/role.entity';
 import { Post } from 'src/posts/entities/post.entity';
+import { Comment } from 'src/comments/entities/comment.entity';
+import { UserProfile } from './user-profile.entity';
 
 @Entity('users')
 export class User {
@@ -17,11 +27,17 @@ export class User {
   @Column()
   name: string;
 
+  @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
+  profile: UserProfile;
+
   @ManyToMany(() => Role, (role) => role.users, { eager: true })
   @JoinTable() // فقط یک سمت نیاز داره
   roles: Role[];
 
-   // ارتباط با پست‌ها
+  @OneToMany(() => Comment, (comment) => comment.author)
+  comments: Comment[];
+
+  // ارتباط با پست‌ها
   @OneToMany(() => Post, (post) => post.author)
   posts: Post[];
 }

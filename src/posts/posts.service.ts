@@ -1,5 +1,9 @@
 // src/posts/posts.service.ts
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Post, PostStatus } from './entities/post.entity';
@@ -14,7 +18,8 @@ export class PostsService {
   constructor(
     @InjectRepository(Post) private readonly postRepo: Repository<Post>,
     @InjectRepository(Tag) private readonly tagRepo: Repository<Tag>,
-    @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
@@ -49,7 +54,9 @@ export class PostsService {
 
     // category (if provided)
     if (dto.categoryId !== undefined && dto.categoryId !== null) {
-      const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+      const category = await this.categoryRepo.findOne({
+        where: { id: dto.categoryId },
+      });
       if (!category) throw new NotFoundException('Category not found');
       post.category = category;
     } else {
@@ -58,8 +65,11 @@ export class PostsService {
 
     // thumbnail & coverImage (support both camelCase and snake_case from client)
     // client ممکنه thumbnail یا thumbnail_url یا cover_image بفرسته
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const anyDto: any = dto as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? '';
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     post.coverImage = anyDto.coverImage ?? anyDto.cover_image ?? '';
 
     // author
@@ -85,7 +95,8 @@ export class PostsService {
     if (dto.title !== undefined) post.title = dto.title;
     if (dto.slug !== undefined) post.slug = dto.slug;
     if (dto.seoTitle !== undefined) post.seoTitle = dto.seoTitle;
-    if (dto.metaDescription !== undefined) post.metaDescription = dto.metaDescription;
+    if (dto.metaDescription !== undefined)
+      post.metaDescription = dto.metaDescription;
     if (dto.excerpt !== undefined) post.excerpt = dto.excerpt;
     if (dto.content !== undefined) post.content = dto.content;
     if (dto.status !== undefined) post.status = dto.status;
@@ -107,19 +118,30 @@ export class PostsService {
       if (dto.categoryId === null) {
         post.category = null;
       } else {
-        const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
+        const category = await this.categoryRepo.findOne({
+          where: { id: dto.categoryId },
+        });
         if (!category) throw new NotFoundException('Category not found');
         post.category = category;
       }
     }
 
     // thumbnail & coverImage
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const anyDto: any = dto as any;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (anyDto.thumbnail !== undefined || anyDto.thumbnail_url !== undefined) {
-      post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? post.thumbnail;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      post.thumbnail =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        anyDto.thumbnail ?? anyDto.thumbnail_url ?? post.thumbnail;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (anyDto.coverImage !== undefined || anyDto.cover_image !== undefined) {
-      post.coverImage = anyDto.coverImage ?? anyDto.cover_image ?? post.coverImage;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,
+      post.coverImage =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        anyDto.coverImage ?? anyDto.cover_image ?? post.coverImage;
     }
 
     return this.postRepo.save(post);
@@ -138,6 +160,7 @@ export class PostsService {
       relations: ['author', 'tags', 'category'],
     });
     if (!post) throw new NotFoundException('Post not found');
+    await this.postRepo.increment({ id }, 'views', 1);
     return post;
   }
 
