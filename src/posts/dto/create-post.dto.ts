@@ -58,6 +58,11 @@ export class CreatePostDto {
   @IsArray()
   inner_tags?: string[];
 
+    @ApiPropertyOptional({ example: 1, description: 'شناسه نویسنده' })
+  @IsOptional()
+  @IsNumber()
+  authorId?: number;  // 🔹 اینو اضافه کن
+  
   @ApiPropertyOptional({
     example: [1, 2],
     description: 'آی‌دی تگ‌های انتخاب شده',

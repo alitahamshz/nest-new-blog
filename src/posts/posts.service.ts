@@ -8,6 +8,7 @@ import { Category } from '../category/entities/category.entity';
 import { User } from '../users/entities/user.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { FilterPostsDto } from './dto/filter-post.dto';
 
 @Injectable()
 export class PostsService {
@@ -125,12 +126,40 @@ export class PostsService {
     return this.postRepo.save(post);
   }
 
-  async findAll(): Promise<Post[]> {
-    return this.postRepo.find({
-      relations: ['author', 'tags', 'category'],
-      order: { id: 'DESC' },
-    });
+async findAll(filterDto: FilterPostsDto) {
+  const { page = 1, limit = 10, title, author, status } = filterDto;
+
+  const query = this.postRepo.createQueryBuilder('post')
+    .leftJoinAndSelect('post.author', 'author')
+    .leftJoinAndSelect('post.category', 'category')
+    .leftJoinAndSelect('post.tags', 'tags')
+    .orderBy('post.createdAt', 'DESC')
+    .skip((page - 1) * limit)
+    .take(limit);
+
+  if (title) {
+    query.andWhere('post.title ILIKE :title', { title: `%${title}%` });
   }
+
+  if (author) {
+    query.andWhere('author.name ILIKE :author', { author: `%${author}%` });
+  }
+
+  if (status) {
+    query.andWhere('post.status = :status', { status });
+  }
+
+  const [items, total] = await query.getManyAndCount();
+
+  return {
+    data: items,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
 
   async findOne(id: number): Promise<Post> {
     const post = await this.postRepo.findOne({
