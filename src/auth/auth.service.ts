@@ -1,5 +1,9 @@
 // auth.service.ts
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../users/users.service';
@@ -13,9 +17,9 @@ export class AuthService {
   constructor(
     private userService: UserService,
     private jwtService: JwtService,
-     @InjectRepository(User)
+    @InjectRepository(User)
     private userRepository: Repository<User>,
-     @InjectRepository(Role)
+    @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
   ) {}
 
@@ -30,7 +34,11 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { sub: user.id, email: user.email, roles: user.roles.map(r => r.name) };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles.map((r) => r.name),
+    };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -41,7 +49,7 @@ export class AuthService {
       },
     };
   }
-   async register(email: string, password: string, name: string) {
+  async register(email: string, password: string, name: string) {
     // چک ایمیل تکراری
     const existing = await this.userRepository.findOne({ where: { email } });
     if (existing) {
@@ -52,7 +60,9 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // نقش user رو از دیتابیس بیار
-    let userRole = await this.roleRepository.findOne({ where: { name: 'user' } });
+    let userRole = await this.roleRepository.findOne({
+      where: { name: 'user' },
+    });
 
     // اگه وجود نداشت، بسازش
     if (!userRole) {

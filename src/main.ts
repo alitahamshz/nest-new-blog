@@ -9,6 +9,13 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/', // دسترسی فرانت به فایل‌ها
   });
+
+  app.setGlobalPrefix('api', {
+    exclude: ['swagger'],
+  });
+ app.enableCors({
+  origin: '*',
+});
   const config = new DocumentBuilder()
     .setTitle('Blog API')
     .setDescription('API documentation for the Blog project')
