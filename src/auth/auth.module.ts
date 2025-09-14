@@ -21,7 +21,7 @@ import { Role } from 'src/roles/entities/role.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('MY_SUPER_SECRET'),
-        signOptions: { expiresIn: '1h' },
+        signOptions: { expiresIn: '24h' },
       }),
     }),
   ],

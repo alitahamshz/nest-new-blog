@@ -29,7 +29,7 @@ export class CreatePostDto {
   })
   @IsOptional()
   @IsString()
-  seoTitle?: string;
+  seo_title?: string;
 
   @ApiPropertyOptional({
     example: 'این مقاله به آموزش فریمورک NestJS می‌پردازد',
@@ -37,7 +37,7 @@ export class CreatePostDto {
   })
   @IsOptional()
   @IsString()
-  metaDescription?: string;
+  meta_description?: string;
 
   @ApiPropertyOptional({
     example: 'یک خلاصه کوتاه از مقاله...',
@@ -77,6 +77,15 @@ export class CreatePostDto {
   @IsOptional()
   @IsArray()
   tags?: number[];
+
+
+  @IsOptional()
+  @IsString()
+  cover_image?: string;
+
+  @IsOptional()
+  @IsString()
+  thumbnail?: string;
 
   @ApiPropertyOptional({
     example: 3,

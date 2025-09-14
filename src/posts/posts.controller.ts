@@ -30,10 +30,12 @@ export class PostsController {
 
   @Get(':id')
   findOne(@Param('id') id: number) {
-    return this.postsService.findOne(id);
+    return this.postsService.findOne(+id);
   }
 }
-@Controller('posts')
+
+
+@Controller('admin/posts')
 export class AdminPostsController {
   constructor(private readonly postsService: PostsService) {}
 

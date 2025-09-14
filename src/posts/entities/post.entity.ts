@@ -18,7 +18,7 @@ import {
 export enum PostStatus {
   DRAFT = 'draft',
   PUBLISHED = 'published',
-  REVIEW = 'review',
+  PENDING = 'pending',
 }
 
 @Entity('posts')
@@ -55,7 +55,7 @@ export class Post {
   inner_tags: string[];
 
   @Column({ default: 0 })
-  viewCount: number; // تعداد بازدید
+  view_count: number; // تعداد بازدید
 
   @ManyToMany(() => Tag, (tag) => tag.posts, { cascade: true })
   @JoinTable({

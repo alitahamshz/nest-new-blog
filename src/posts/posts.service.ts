@@ -38,10 +38,11 @@ export class PostsService {
 
     post.title = dto.title;
     post.slug = dto.slug;
-    post.seo_title = dto.seoTitle ?? '';
-    post.meta_description = dto.metaDescription ?? '';
+    post.seo_title = dto.seo_title ?? '';
+    post.meta_description = dto.meta_description ?? '';
     post.excerpt = dto.excerpt ?? '';
     post.content = dto.content ?? '';
+    post.inner_tags = dto.inner_tags ?? [];
     post.status = dto.status ?? PostStatus.DRAFT;
 
     // tags (if provided)
@@ -69,9 +70,9 @@ export class PostsService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const anyDto: any = dto as any;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? '';
+    post.thumbnail = anyDto.thumbnail ?? '';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    post.cover_image = anyDto.coverImage ?? anyDto.cover_image ?? '';
+    post.cover_image = anyDto.cover_image ?? '';
 
     // author
     const author = await this.userRepo.findOne({ where: { id: authorId } });
@@ -99,6 +100,7 @@ export class PostsService {
     if (dto.meta_description !== undefined)
       post.meta_description = dto.meta_description;
     if (dto.excerpt !== undefined) post.excerpt = dto.excerpt;
+    if (dto.inner_tags !== undefined) post.inner_tags = dto.inner_tags;
     if (dto.content !== undefined) post.content = dto.content;
     if (dto.status !== undefined) post.status = dto.status;
 
@@ -189,7 +191,7 @@ export class PostsService {
       relations: ['author', 'tags', 'category'],
     });
     if (!post) throw new NotFoundException('Post not found');
-    await this.postRepo.increment({ id }, 'views', 1);
+    await this.postRepo.increment({ id }, 'view_count', 1);
     return post;
   }
 

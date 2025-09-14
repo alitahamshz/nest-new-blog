@@ -20,7 +20,7 @@ export class FilesService {
     const newFile = this.fileRepository.create({
       filename: file.filename,
       path: `uploads/${year}/${month}/${file.filename}`,
-      url: `http://localhost:3000/uploads/${year}/${month}/${file.filename}`, // بعداً میشه دامین اصلی
+      url: `http://localhost:3003/uploads/${year}/${month}/${file.filename}`, // بعداً میشه دامین اصلی
       mimeType: file.mimetype,
       size: file.size,
     });
