@@ -15,12 +15,18 @@ export class CreatePostDto {
   @IsString()
   title: string;
 
-  @ApiProperty({ example: 'nestjs-learning', description: 'اسلاگ یکتا برای پست' })
+  @ApiProperty({
+    example: 'nestjs-learning',
+    description: 'اسلاگ یکتا برای پست',
+  })
   @IsNotEmpty()
   @IsString()
   slug: string;
 
-  @ApiPropertyOptional({ example: 'آموزش جامع NestJS', description: 'عنوان سئو' })
+  @ApiPropertyOptional({
+    example: 'آموزش جامع NestJS',
+    description: 'عنوان سئو',
+  })
   @IsOptional()
   @IsString()
   seoTitle?: string;
@@ -58,11 +64,11 @@ export class CreatePostDto {
   @IsArray()
   inner_tags?: string[];
 
-    @ApiPropertyOptional({ example: 1, description: 'شناسه نویسنده' })
+  @ApiPropertyOptional({ example: 1, description: 'شناسه نویسنده' })
   @IsOptional()
   @IsNumber()
-  authorId?: number;  // 🔹 اینو اضافه کن
-  
+  author_id?: number; // 🔹 اینو اضافه کن
+
   @ApiPropertyOptional({
     example: [1, 2],
     description: 'آی‌دی تگ‌های انتخاب شده',
@@ -79,7 +85,7 @@ export class CreatePostDto {
   })
   @IsOptional()
   @IsNumber()
-  categoryId?: number;
+  category_id?: number;
 
   @ApiPropertyOptional({
     enum: PostStatus,

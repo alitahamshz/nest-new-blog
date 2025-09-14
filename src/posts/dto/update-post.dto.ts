@@ -22,12 +22,12 @@ export class UpdatePostDto {
   @ApiPropertyOptional({ example: 'سئو پیشرفته NestJS' })
   @IsOptional()
   @IsString()
-  seoTitle?: string;
+  seo_title?: string;
 
   @ApiPropertyOptional({ example: 'این مقاله درباره NestJS است...' })
   @IsOptional()
   @IsString()
-  metaDescription?: string;
+  meta_description?: string;
 
   @ApiPropertyOptional({ example: 'خلاصه جدید مقاله...' })
   @IsOptional()
@@ -52,7 +52,7 @@ export class UpdatePostDto {
   @ApiPropertyOptional({ example: 2 })
   @IsOptional()
   @IsNumber()
-  categoryId?: number;
+  category_id?: number;
 
   @ApiPropertyOptional({
     enum: PostStatus,

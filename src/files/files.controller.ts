@@ -33,10 +33,10 @@ export class FilesController {
         destination: (req, file, cb) => {
           const uploadPath = getUploadPath();
           cb(null, uploadPath);
-              // ایجاد پوشه در صورت عدم وجود
-        if (!existsSync(uploadPath)) {
-          mkdirSync(uploadPath, { recursive: true });
-        }
+          // ایجاد پوشه در صورت عدم وجود
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
         },
         filename: (req, file, cb) => {
           const uniqueSuffix =

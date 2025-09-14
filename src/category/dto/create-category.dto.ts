@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, Matches, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  // IsNumber,
+} from 'class-validator';
 
 export class CreateCategoryDto {
   @ApiProperty({ example: 'Programming', description: 'نام دسته‌بندی' })
@@ -7,7 +13,10 @@ export class CreateCategoryDto {
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ example: 'programming', description: 'اسلاگ دسته‌بندی' })
+  @ApiPropertyOptional({
+    example: 'programming',
+    description: 'اسلاگ دسته‌بندی',
+  })
   @IsOptional()
   @IsString()
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
@@ -17,5 +26,5 @@ export class CreateCategoryDto {
 
   @ApiPropertyOptional({ example: 1, description: 'شناسه والد دسته‌بندی' })
   @IsOptional()
-  parentId?: number;
+  parent_id?: number | null;
 }

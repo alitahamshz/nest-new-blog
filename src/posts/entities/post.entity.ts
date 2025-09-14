@@ -32,7 +32,7 @@ export class Post {
 
   // عنوان سئو
   @Column({ length: 200, nullable: true })
-  seoTitle: string;
+  seo_title: string;
 
   // اسلاگ (برای آدرس URL)
   @Column({ length: 200, unique: true })
@@ -40,7 +40,7 @@ export class Post {
 
   // متا دسکریپشن
   @Column({ type: 'varchar', length: 300, nullable: true })
-  metaDescription: string;
+  meta_description: string;
 
   // خلاصه مقاله
   @Column({ type: 'text', nullable: true })
@@ -83,7 +83,7 @@ export class Post {
 
   // تصویر کاور
   @Column({ nullable: true })
-  coverImage: string;
+  cover_image: string;
 
   // وضعیت مقاله
   @Column({

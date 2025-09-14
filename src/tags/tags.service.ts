@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import slugify from 'slugify';
+// import slugify from 'slugify';
 import { Tag } from './entities/tag.entity';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
@@ -14,13 +14,13 @@ export class TagsService {
     private readonly tagRepository: Repository<Tag>,
   ) {}
 
-  private generateSlug(name: string): string {
-    return slugify(name, { lower: true, strict: true });
-  }
+  // private generateSlug(name: string): string {
+  //   return slugify(name, { lower: true, strict: true });
+  // }
 
   async create(dto: CreateTagDto): Promise<Tag> {
-    let slug = dto.slug || this.generateSlug(dto.name);
-    const tag = this.tagRepository.create({ ...dto, slug });
+    // const slug = dto.slug || this.generateSlug(dto.name);
+    const tag = this.tagRepository.create({ ...dto });
     return this.tagRepository.save(tag);
   }
 
@@ -37,9 +37,9 @@ export class TagsService {
   async update(id: number, dto: UpdateTagDto): Promise<Tag> {
     const tag = await this.findOne(id);
     Object.assign(tag, dto);
-    if (dto.name && !dto.slug) {
-      tag.slug = this.generateSlug(dto.name);
-    }
+    // if (dto.name && !dto.slug) {
+    //   tag.slug = this.generateSlug(dto.name);
+    // }
     return this.tagRepository.save(tag);
   }
 

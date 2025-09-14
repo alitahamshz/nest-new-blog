@@ -38,8 +38,8 @@ export class PostsService {
 
     post.title = dto.title;
     post.slug = dto.slug;
-    post.seoTitle = dto.seoTitle ?? '';
-    post.metaDescription = dto.metaDescription ?? '';
+    post.seo_title = dto.seoTitle ?? '';
+    post.meta_description = dto.metaDescription ?? '';
     post.excerpt = dto.excerpt ?? '';
     post.content = dto.content ?? '';
     post.status = dto.status ?? PostStatus.DRAFT;
@@ -54,9 +54,9 @@ export class PostsService {
     }
 
     // category (if provided)
-    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+    if (dto.category_id !== undefined && dto.category_id !== null) {
       const category = await this.categoryRepo.findOne({
-        where: { id: dto.categoryId },
+        where: { id: dto.category_id },
       });
       if (!category) throw new NotFoundException('Category not found');
       post.category = category;
@@ -71,7 +71,7 @@ export class PostsService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     post.thumbnail = anyDto.thumbnail ?? anyDto.thumbnail_url ?? '';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    post.coverImage = anyDto.coverImage ?? anyDto.cover_image ?? '';
+    post.cover_image = anyDto.coverImage ?? anyDto.cover_image ?? '';
 
     // author
     const author = await this.userRepo.findOne({ where: { id: authorId } });
@@ -95,9 +95,9 @@ export class PostsService {
     // update only provided fields
     if (dto.title !== undefined) post.title = dto.title;
     if (dto.slug !== undefined) post.slug = dto.slug;
-    if (dto.seoTitle !== undefined) post.seoTitle = dto.seoTitle;
-    if (dto.metaDescription !== undefined)
-      post.metaDescription = dto.metaDescription;
+    if (dto.seo_title !== undefined) post.seo_title = dto.seo_title;
+    if (dto.meta_description !== undefined)
+      post.meta_description = dto.meta_description;
     if (dto.excerpt !== undefined) post.excerpt = dto.excerpt;
     if (dto.content !== undefined) post.content = dto.content;
     if (dto.status !== undefined) post.status = dto.status;
@@ -115,12 +115,12 @@ export class PostsService {
     }
 
     // category: allow setting to null (remove category)
-    if (dto.categoryId !== undefined) {
-      if (dto.categoryId === null) {
+    if (dto.category_id !== undefined) {
+      if (dto.category_id === null) {
         post.category = null;
       } else {
         const category = await this.categoryRepo.findOne({
-          where: { id: dto.categoryId },
+          where: { id: dto.category_id },
         });
         if (!category) throw new NotFoundException('Category not found');
         post.category = category;
@@ -140,48 +140,48 @@ export class PostsService {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (anyDto.coverImage !== undefined || anyDto.cover_image !== undefined) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment,
-      post.coverImage =
+      post.cover_image =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        anyDto.coverImage ?? anyDto.cover_image ?? post.coverImage;
+        anyDto.coverImage ?? anyDto.cover_image ?? post.cover_image;
     }
 
     return this.postRepo.save(post);
   }
 
-async findAll(filterDto: FilterPostsDto) {
-  const { page = 1, limit = 10, title, author, status } = filterDto;
+  async findAll(filterDto: FilterPostsDto) {
+    const { page = 1, limit = 10, title, author, status } = filterDto;
 
-  const query = this.postRepo.createQueryBuilder('post')
-    .leftJoinAndSelect('post.author', 'author')
-    .leftJoinAndSelect('post.category', 'category')
-    .leftJoinAndSelect('post.tags', 'tags')
-    .orderBy('post.createdAt', 'DESC')
-    .skip((page - 1) * limit)
-    .take(limit);
+    const query = this.postRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.category', 'category')
+      .leftJoinAndSelect('post.tags', 'tags')
+      .orderBy('post.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
 
-  if (title) {
-    query.andWhere('post.title ILIKE :title', { title: `%${title}%` });
+    if (title) {
+      query.andWhere('post.title ILIKE :title', { title: `%${title}%` });
+    }
+
+    if (author) {
+      query.andWhere('author.name ILIKE :author', { author: `%${author}%` });
+    }
+
+    if (status) {
+      query.andWhere('post.status = :status', { status });
+    }
+
+    const [items, total] = await query.getManyAndCount();
+
+    return {
+      data: items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
-
-  if (author) {
-    query.andWhere('author.name ILIKE :author', { author: `%${author}%` });
-  }
-
-  if (status) {
-    query.andWhere('post.status = :status', { status });
-  }
-
-  const [items, total] = await query.getManyAndCount();
-
-  return {
-    data: items,
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  };
-}
-
 
   async findOne(id: number): Promise<Post> {
     const post = await this.postRepo.findOne({
