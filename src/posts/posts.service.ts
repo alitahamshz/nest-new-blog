@@ -201,4 +201,13 @@ export class PostsService {
     await this.postRepo.delete(id);
     return { message: 'Post deleted' };
   }
+
+  async findLatestPosts(): Promise<Post[]> {
+    const posts = await this.postRepo.find({
+      order: { createdAt: 'DESC' }, // مرتب‌سازی بر اساس تاریخ ایجاد
+      take: 5, // فقط ۵ مورد آخر
+    });
+    if (!posts) throw new NotFoundException('مطلبی یافت نشد!');
+    return posts;
+  }
 }

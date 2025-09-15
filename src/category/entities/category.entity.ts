@@ -19,6 +19,9 @@ export class Category {
   @Column({ length: 200 })
   name: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  en_name?: string | null;
+
   @Column({ length: 200, unique: true })
   slug: string;
 

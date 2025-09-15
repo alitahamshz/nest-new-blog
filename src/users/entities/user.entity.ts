@@ -21,7 +21,7 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({select: false})
+  @Column()
   password: string; // بعدا هش میشه
 
   @Column()

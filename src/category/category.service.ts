@@ -18,6 +18,7 @@ export class CategoryService {
   async create(dto: CreateCategoryDto) {
     const category = this.categoriesRepository.create({
       name: dto.name,
+      en_name: dto.en_name,
       slug: dto.slug,
     });
 
@@ -40,6 +41,7 @@ export class CategoryService {
 
     // فیلدهای ساده رو آپدیت کن
     category.name = updateCategoryDto.name ?? category.name;
+    category.en_name = updateCategoryDto.en_name ?? category.en_name;
     category.slug = updateCategoryDto.slug ?? category.slug;
 
     // اگر parentId داده شده بود، والد رو آپدیت کن

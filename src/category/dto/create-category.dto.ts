@@ -8,10 +8,15 @@ import {
 } from 'class-validator';
 
 export class CreateCategoryDto {
-  @ApiProperty({ example: 'Programming', description: 'نام دسته‌بندی' })
+  @ApiProperty({ example: 'برنامه نویسی', description: 'نام دسته‌بندی' })
   @IsNotEmpty()
   @IsString()
   name: string;
+
+  @ApiProperty({ example: 'Programming', description: 'نام انگلیسی دسته بندی' })
+  @IsOptional()
+  @IsString()
+  en_name: string;
 
   @ApiPropertyOptional({
     example: 'programming',
