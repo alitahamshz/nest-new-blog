@@ -11,6 +11,9 @@ export class Tag {
   name: string;
 
   @Column({ unique: true })
+  en_name: string;
+
+  @Column({ unique: true })
   slug: string;
 
   @ManyToMany(() => Post, (post) => post.tags)

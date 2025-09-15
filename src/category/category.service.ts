@@ -73,6 +73,7 @@ export class CategoryService {
       .select([
         'category.id AS id',
         'category.name AS name',
+        'category.en_name AS en_name',
         'parent.id AS parent_id',
       ])
       .orderBy('category.id', 'ASC')

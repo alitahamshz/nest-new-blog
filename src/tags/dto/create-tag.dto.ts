@@ -3,10 +3,15 @@ import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTagDto {
-  @ApiProperty({ example: 'nestjs', description: 'نام تگ' })
+  @ApiProperty({ example: 'نست جی اس', description: 'نام تگ' })
   @IsNotEmpty()
   @IsString()
   name: string;
+
+  @ApiProperty({ example: 'nestjs', description: 'نام لاتین' })
+  @IsNotEmpty()
+  @IsString()
+  en_name: string;
 
   @ApiPropertyOptional({ example: 'nestjs', description: 'اسلاگ تگ' })
   @IsOptional()

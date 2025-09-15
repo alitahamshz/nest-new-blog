@@ -9,6 +9,7 @@ import {
   Delete,
   Patch,
   Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -32,6 +33,24 @@ export class PostsController {
   findOne(@Param('id') id: number) {
     return this.postsService.findOne(+id);
   }
+
+@Get('category/:en_name')
+findByCategory(@Param('en_name') en_name: string) {
+  return this.postsService.findLast10ByCategory(en_name);
+}
+@Get('latest/:take')
+findFiveLatest(@Param('take', ParseIntPipe) take : number) {
+  return this.postsService.findLatestPosts(take);
+}
+
+@Get('cat/*path')
+findByCategories(@Query('names') names?: string) {
+  console.log("Route hit");
+  if (!names) return []; // یا BadRequest
+  const en_names = names.split(',');
+  return this.postsService.findLast10ByCategories(en_names);
+}
+
 }
 
 @Controller('admin/posts')

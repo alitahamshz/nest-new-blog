@@ -202,12 +202,43 @@ export class PostsService {
     return { message: 'Post deleted' };
   }
 
-  async findLatestPosts(): Promise<Post[]> {
+  async findLatestPosts(take: number) {
     const posts = await this.postRepo.find({
       order: { createdAt: 'DESC' }, // مرتب‌سازی بر اساس تاریخ ایجاد
-      take: 5, // فقط ۵ مورد آخر
+      take: take, // فقط ۵ مورد آخر
     });
-    if (!posts) throw new NotFoundException('مطلبی یافت نشد!');
+
+    if (!posts.length) throw new NotFoundException('مطلبی یافت نشد!');
     return posts;
+  }
+
+  async findLast10ByCategory(en_name: string) {
+    return this.postRepo.find({
+      relations: ['category'],
+      where: { category: { en_name } },
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+  }
+
+  async findLast10ByCategories(en_names: string[]) {
+    const query = this.postRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.category', 'category')
+      .where('category.en_name IN (:...en_names)', { en_names })
+      .orderBy('post.createdAt', 'DESC');
+
+    const posts = await query.getMany();
+    console.log({ posts });
+    console.error('Here I am', en_names);
+    process.stdout.write('Here I am\n');
+    const grouped: Record<string, Post[]> = {};
+    for (const en_name of en_names) {
+      grouped[en_name] = posts
+        .filter((p) => p.category?.en_name === en_name)
+        .slice(0, 10); // آخرین ۱۰ پست هر دسته
+    }
+
+    return grouped;
   }
 }
