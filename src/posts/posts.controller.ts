@@ -38,6 +38,11 @@ export class PostsController {
     return this.postsService.findLast10ByCategories(query.names);
   }
 
+  @Get('last5/by/parent')
+  findLast5ByParentCategories() {
+    return this.postsService.findLast5PostsByParentCategories();
+  }
+
   @Get('slug/:slug')
   findPostBySlug(@Param('slug') slug: string) {
     return this.postsService.findBySlug(slug);

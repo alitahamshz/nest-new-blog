@@ -39,6 +39,10 @@ export class CategoryController {
   findParent() {
     return this.categoryService.findParents();
   }
+  @Get('parents/posts/count')
+findParentCategoriesWithPostCount() {
+  return this.categoryService.findParentCategoriesWithPostCount();
+}
 }
 @ApiTags('admin/category')
 @Roles('admin')

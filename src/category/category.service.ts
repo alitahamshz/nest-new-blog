@@ -95,6 +95,87 @@ export class CategoryService {
     });
   }
 
+  // category.service.ts
+  async findParentCategoriesWithPostCount() {
+    const categories = await this.categoriesRepository
+      .createQueryBuilder('category')
+      .leftJoin('category.posts', 'post')
+      .where('category.parent IS NULL')
+      .loadRelationCountAndMap('category.postsCount', 'category.posts')
+      .getMany();
+
+    return categories.map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      en_name: cat.en_name,
+      slug: cat.slug,
+      postsCount: (cat as any).postsCount,
+    }));
+  }
+
+  async findParentCategoriesWithPostCountRecursive() {
+    return this.categoriesRepository
+      .createQueryBuilder('parent')
+      .leftJoin('parent.posts', 'post')
+      .leftJoin('category_closure', 'closure', 'closure.descendant = parent.id')
+      .select('parent.id', 'id')
+      .addSelect('parent.name', 'name')
+      .addSelect('parent.en_name', 'en_name')
+      .addSelect('parent.slug', 'slug')
+      .addSelect(
+        `(SELECT COUNT(*) 
+        FROM category AS c
+        LEFT JOIN post AS p ON p.categoryId = c.id
+        WHERE c.id = parent.id OR c.id IN (
+          SELECT descendant 
+          FROM category_closure 
+          WHERE ancestor = parent.id
+        )
+      )`,
+        'postsCount',
+      )
+      .where('parent.parent IS NULL')
+      .getRawMany();
+  }
+
+  // async getPostCountForCategoryAndDescendants(
+  //   categoryId: number,
+  // ): Promise<{ categoryId: number; totalPosts: number }> {
+  //   // مرحله ۱: دسته‌بندی اصلی را پیدا می‌کنیم
+  //   const parentCategory = await this.categoriesRepository.findOneBy({ id: categoryId });
+
+  //   if (!parentCategory) {
+  //     throw new NotFoundException(`دسته بندی با ID ${categoryId} یافت نشد.`);
+  //   }
+
+  //   // مرحله ۲: با استفاده از متد findDescendants، خود دسته‌بندی و تمام زیرشاخه‌های آن را پیدا می‌کنیم
+  //   // این متد یک آرایه flat (مسطح) از تمام فرزندان و نوه‌ها و ... برمی‌گرداند
+  //   const categoriesTree = await this.categoriesRepository.findDescendants(parentCategory);
+
+  //   // اگر هیچ دسته‌بندی‌ای پیدا نشد (که حداقل باید خود والد باشد)، صفر برمی‌گردانیم
+  //   if (categoriesTree.length === 0) {
+  //     return { categoryId, totalPosts: 0 };
+  //   }
+
+  //   // مرحله ۳: فقط ID های این دسته‌بندی‌ها را استخراج می‌کنیم
+  //   const categoryIds = categoriesTree.map((category) => category.id);
+
+  //   // مرحله ۴: تعداد پست‌هایی که categoryId آنها در لیست IDهای ما قرار دارد را می‌شماریم
+  //   // استفاده از اپراتور In باعث می‌شود TypeORM یک کوئری `WHERE category.id IN (...)` بهینه ایجاد کند
+  //   const totalPosts = await this.postRepository.count({
+  //     where: {
+  //       category: {
+  //         id: In(categoryIds),
+  //       },
+  //     },
+  //   });
+
+  //   return {
+  //     categoryId,
+  //     totalPosts,
+  //   };
+  // }
+
   remove(id: number) {
     return this.categoriesRepository.delete(id);
   }

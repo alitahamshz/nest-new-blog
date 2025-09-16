@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import { Post, PostStatus } from './entities/post.entity';
 import { Tag } from '../tags/entities/tag.entity';
 import { Category } from '../category/entities/category.entity';
@@ -13,15 +13,24 @@ import { User } from '../users/entities/user.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto } from './dto/filter-post.dto';
-
+import { TreeRepository } from 'typeorm';
 @Injectable()
 export class PostsService {
   constructor(
-    @InjectRepository(Post) private readonly postRepo: Repository<Post>,
-    @InjectRepository(Tag) private readonly tagRepo: Repository<Tag>,
+    @InjectRepository(Post)
+    private readonly postRepo: Repository<Post>,
+
+    @InjectRepository(Tag)
+    private readonly tagRepo: Repository<Tag>,
+
     @InjectRepository(Category)
-    private readonly categoryRepo: Repository<Category>,
-    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    private readonly categoryRepo: Repository<Category>, // برای کوئری‌های معمولی
+
+    @InjectRepository(Category)
+    private readonly treeCategoryRepo: TreeRepository<Category>, // برای متدهای tree
+
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   /**
@@ -204,6 +213,7 @@ export class PostsService {
 
   async findLatestPosts(take: number) {
     const posts = await this.postRepo.find({
+      relations: ['category'],
       order: { createdAt: 'DESC' }, // مرتب‌سازی بر اساس تاریخ ایجاد
       take: take, // فقط ۵ مورد آخر
     });
@@ -235,16 +245,72 @@ export class PostsService {
     }));
   }
 
-  async findBySlug(slug: string): Promise<Post> {
-    const post = await this.postRepo.findOne({
-      where: { slug },
-      // relations: ['category'], // اگر میخوای دسته‌بندی هم بیاد
+  async findLast5PostsByParentCategories() {
+    // ۱. گرفتن همه‌ی دسته‌بندی‌های والد
+    const parentCategories = await this.categoryRepo.find({
+      where: { parent: IsNull() },
     });
 
-    if (!post) {
-      throw new NotFoundException(`پست با slug "${slug}" پیدا نشد`);
+    // ۲. گرفتن ۵ پست آخر برای هر دسته والد
+    const result: Record<string, Post[]> = {};
+    for (const parent of parentCategories) {
+      const posts = await this.postRepo.find({
+        where: { category: { id: parent.id } },
+        relations: ['category'],
+        order: { createdAt: 'DESC' },
+        take: 10,
+      });
+      result[parent.name || parent.slug] = posts;
     }
 
-    return post;
+    return result;
+  }
+
+  // async findBySlug(slug: string): Promise<Post> {
+  //   const post = await this.postRepo.findOne({
+  //     where: { slug },
+  //     relations: ['category'], // اگر میخوای دسته‌بندی هم بیاد
+  //   });
+
+  //   if (!post) {
+  //     throw new NotFoundException(`پست با slug "${slug}" پیدا نشد`);
+  //   }
+  //   // await this.postRepo.increment({ id }, 'view_count', 1);
+  //   return post;
+  // }
+
+  async getCategoryBreadcrumb(categoryId: number) {
+    // treeCategoryRepo از نوع TreeRepository<Category> هست
+    const category = await this.treeCategoryRepo.findOne({
+      where: { id: categoryId },
+    });
+    if (!category) return [];
+
+    // همه والدها تا ریشه
+    const ancestors = await this.treeCategoryRepo.findAncestors(category);
+
+    // خروجی: آرایه‌ای از دسته‌ها از ریشه تا خود دسته
+    // مثلا: [مو, آرایش مو, برس]
+    return ancestors;
+  }
+
+  async findBySlug(slug: string) {
+    const post = await this.postRepo.findOne({
+      where: { slug },
+      relations: ['category'],
+    });
+    if (!post) throw new NotFoundException('Post not found');
+    // افزایش بازدید
+    await this.postRepo.increment({ id: post.id }, 'view_count', 1);
+    // breadcrumb
+    let breadcrumb: Category[] = [];
+    if (post.category) {
+      breadcrumb = await this.getCategoryBreadcrumb(post.category.id);
+    }
+
+    return {
+      ...post,
+      breadcrumb, // اینو به فرانت می‌فرستی
+    };
   }
 }
