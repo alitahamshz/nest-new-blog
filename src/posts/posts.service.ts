@@ -222,23 +222,29 @@ export class PostsService {
   }
 
   async findLast10ByCategories(en_names: string[]) {
-    const query = this.postRepo
-      .createQueryBuilder('post')
-      .leftJoinAndSelect('post.category', 'category')
-      .where('category.en_name IN (:...en_names)', { en_names })
-      .orderBy('post.createdAt', 'DESC');
+    const posts = await this.postRepo.find({
+      relations: ['category'],
+      where: { category: { en_name: In(en_names) } },
+      order: { createdAt: 'DESC' },
+    });
 
-    const posts = await query.getMany();
-    console.log({ posts });
-    console.error('Here I am', en_names);
-    process.stdout.write('Here I am\n');
-    const grouped: Record<string, Post[]> = {};
-    for (const en_name of en_names) {
-      grouped[en_name] = posts
-        .filter((p) => p.category?.en_name === en_name)
-        .slice(0, 10); // آخرین ۱۰ پست هر دسته
+    // خروجی به شکل [{ category: 'hair', posts: [...] }, ...]
+    return en_names.map((name) => ({
+      category: name,
+      posts: posts.filter((p) => p.category?.en_name === name).slice(0, 10),
+    }));
+  }
+
+  async findBySlug(slug: string): Promise<Post> {
+    const post = await this.postRepo.findOne({
+      where: { slug },
+      // relations: ['category'], // اگر میخوای دسته‌بندی هم بیاد
+    });
+
+    if (!post) {
+      throw new NotFoundException(`پست با slug "${slug}" پیدا نشد`);
     }
 
-    return grouped;
+    return post;
   }
 }

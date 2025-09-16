@@ -35,6 +35,10 @@ export class CategoryController {
   findOne(@Param('id') id: string) {
     return this.categoryService.findOne(+id);
   }
+  @Get('find/parents')
+  findParent() {
+    return this.categoryService.findParents();
+  }
 }
 @ApiTags('admin/category')
 @Roles('admin')
