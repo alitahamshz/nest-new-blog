@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { PostsService } from './posts.service';
@@ -40,6 +41,7 @@ export class PostsController {
 
   @Get('last5/by/parent')
   findLast5ByParentCategories() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.postsService.findLast5PostsByParentCategories();
   }
 

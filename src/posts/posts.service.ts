@@ -245,26 +245,26 @@ export class PostsService {
     }));
   }
 
-  async findLast5PostsByParentCategories() {
-    // ۱. گرفتن همه‌ی دسته‌بندی‌های والد
-    const parentCategories = await this.categoryRepo.find({
-      where: { parent: IsNull() },
-    });
+  // async findLast5PostsByParentCategories() {
+  //   // ۱. گرفتن همه‌ی دسته‌بندی‌های والد
+  //   const parentCategories = await this.categoryRepo.find({
+  //     where: { parent: IsNull() },
+  //   });
 
-    // ۲. گرفتن ۵ پست آخر برای هر دسته والد
-    const result: Record<string, Post[]> = {};
-    for (const parent of parentCategories) {
-      const posts = await this.postRepo.find({
-        where: { category: { id: parent.id } },
-        relations: ['category'],
-        order: { createdAt: 'DESC' },
-        take: 10,
-      });
-      result[parent.name || parent.slug] = posts;
-    }
+  //   // ۲. گرفتن ۵ پست آخر برای هر دسته والد
+  //   const result: Record<string, Post[]> = {};
+  //   for (const parent of parentCategories) {
+  //     const posts = await this.postRepo.find({
+  //       where: { category: { id: parent.id } },
+  //       relations: ['category'],
+  //       order: { createdAt: 'DESC' },
+  //       take: 10,
+  //     });
+  //     result[parent.name || parent.slug] = posts;
+  //   }
 
-    return result;
-  }
+  //   return result;
+  // }
 
   // async findBySlug(slug: string): Promise<Post> {
   //   const post = await this.postRepo.findOne({
@@ -278,6 +278,33 @@ export class PostsService {
   //   // await this.postRepo.increment({ id }, 'view_count', 1);
   //   return post;
   // }
+
+  async findLast5PostsByParentCategories() {
+    // ۱. گرفتن همه‌ی دسته‌های والد
+    const parentCategories = await this.categoryRepo.find({
+      where: { parent: IsNull() },
+    });
+
+    const result: Record<string, Post[]> = {};
+
+    for (const parent of parentCategories) {
+      // ۲. پیدا کردن همه‌ی descendants (خود والد + فرزندانش)
+      const tree = await this.treeCategoryRepo.findDescendants(parent);
+      const ids = tree.map((c) => c.id);
+
+      // ۳. گرفتن پست‌های متعلق به والد و همه‌ی فرزندانش
+      const posts = await this.postRepo.find({
+        where: { category: { id: In(ids) } },
+        relations: ['category'],
+        order: { createdAt: 'DESC' },
+        take: 5,
+      });
+
+      result[parent.name || parent.slug] = posts;
+    }
+
+    return result;
+  }
 
   async getCategoryBreadcrumb(categoryId: number) {
     // treeCategoryRepo از نوع TreeRepository<Category> هست
