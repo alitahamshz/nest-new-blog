@@ -96,20 +96,48 @@ export class CategoryService {
   }
 
   // category.service.ts
+  // async findParentCategoriesWithPostCount() {
+  //   const categories = await this.categoriesRepository
+  //     .createQueryBuilder('category')
+  //     .leftJoin('category.posts', 'post')
+  //     .where('category.parent IS NULL')
+  //     .loadRelationCountAndMap('category.postsCount', 'category.posts')
+  //     .getMany();
+
+  //   return categories.map((cat) => ({
+  //     id: cat.id,
+  //     name: cat.name,
+  //     en_name: cat.en_name,
+  //     slug: cat.slug,
+  //     postsCount: (cat as any).postsCount,
+  //   }));
+  // }
+
   async findParentCategoriesWithPostCount() {
     const categories = await this.categoriesRepository
       .createQueryBuilder('category')
+      .leftJoin('category.children', 'child')
+      .leftJoin('child.children', 'grandchild')
       .leftJoin('category.posts', 'post')
+      .leftJoin('child.posts', 'childPost')
+      .leftJoin('grandchild.posts', 'grandchildPost')
       .where('category.parent IS NULL')
-      .loadRelationCountAndMap('category.postsCount', 'category.posts')
-      .getMany();
+      .select('category.id', 'id')
+      .addSelect('category.name', 'name')
+      .addSelect('category.en_name', 'en_name')
+      .addSelect(
+        'COUNT(DISTINCT post.id) + COUNT(DISTINCT childPost.id) + COUNT(DISTINCT grandchildPost.id)',
+        'postsCount',
+      )
+      .groupBy('category.id')
+      .addGroupBy('category.name')
+      .getRawMany();
 
-    return categories.map((cat) => ({
-      id: cat.id,
-      name: cat.name,
-      en_name: cat.en_name,
-      slug: cat.slug,
-      postsCount: (cat as any).postsCount,
+    return categories.map((row) => ({
+      id: row.id,
+      name: row.name,
+      en_name:row.en_name,
+      postsCount: Number(row.postsCount),
     }));
   }
 
@@ -178,5 +206,12 @@ export class CategoryService {
 
   remove(id: number) {
     return this.categoriesRepository.delete(id);
+  }
+
+  async findCategoryRoute(en_name: string) {
+    return this.categoriesRepository.findOne({
+      where: { en_name: en_name },
+      relations: ['parent', 'parent.parent', 'parent.parent.parent'],
+    });
   }
 }

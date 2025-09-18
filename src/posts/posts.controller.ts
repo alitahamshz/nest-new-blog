@@ -4,6 +4,7 @@ import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { FilterPostsDto } from './dto/filter-post.dto';
 import { GetPostsByCategoriesDto } from './dto/filter-names.dto';
+import { PaginateByCategoryDto } from './dto/paginate-by-category.dto';
 
 @Controller('posts')
 export class PostsController {
@@ -48,5 +49,13 @@ export class PostsController {
   @Get('slug/:slug')
   findPostBySlug(@Param('slug') slug: string) {
     return this.postsService.findBySlug(slug);
+  }
+
+  @Get('by/category/:en_name')
+  postByCategory(
+    @Param('en_name') en_name: string,
+    @Query() query: PaginateByCategoryDto,
+  ) {
+    return this.postsService.findPostsByCategoryEnName(en_name, query);
   }
 }

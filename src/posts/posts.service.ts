@@ -14,6 +14,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto } from './dto/filter-post.dto';
 import { TreeRepository } from 'typeorm';
+import { PaginateByCategoryDto } from './dto/paginate-by-category.dto';
 @Injectable()
 export class PostsService {
   constructor(
@@ -285,7 +286,13 @@ export class PostsService {
       where: { parent: IsNull() },
     });
 
-    const result: Record<string, Post[]> = {};
+    const result: {
+      id: number;
+      name: string;
+      en_name: string | null | undefined;
+      slug: string;
+      posts: Post[];
+    }[] = [];
 
     for (const parent of parentCategories) {
       // ۲. پیدا کردن همه‌ی descendants (خود والد + فرزندانش)
@@ -297,10 +304,16 @@ export class PostsService {
         where: { category: { id: In(ids) } },
         relations: ['category'],
         order: { createdAt: 'DESC' },
-        take: 5,
+        take: 6,
       });
 
-      result[parent.name || parent.slug] = posts;
+      result.push({
+        id: parent.id,
+        name: parent.name,
+        en_name: parent.en_name,
+        slug: parent.slug,
+        posts,
+      });
     }
 
     return result;
@@ -338,6 +351,68 @@ export class PostsService {
     return {
       ...post,
       breadcrumb, // اینو به فرانت می‌فرستی
+    };
+  }
+
+  // async findPostsByCategoryEnName(
+  //   en_name: string,
+  //   { page = 1, limit = 10 }: PaginateByCategoryDto,
+  // ) {
+  //   const category = await this.categoryRepo.findOne({ where: { en_name } });
+  //   if (!category) {
+  //     throw new NotFoundException(`دسته بندی با en_name "${en_name}" پیدا نشد`);
+  //   }
+
+  //   const [posts, total] = await this.postRepo.findAndCount({
+  //     where: { category: { id: category.id } },
+  //     relations: ['category', 'author', 'tags'],
+  //     order: { createdAt: 'DESC' },
+  //     skip: (page - 1) * limit,
+  //     take: limit,
+  //   });
+
+  //   return {
+  //     data: posts,
+  //     meta: {
+  //       total,
+  //       page,
+  //       limit,
+  //       totalPages: Math.ceil(total / limit),
+  //     },
+  //   };
+  // }
+  async findPostsByCategoryEnName(
+    en_name: string,
+    { page = 1, limit = 10 }: PaginateByCategoryDto,
+  ) {
+    // پیدا کردن دسته اصلی
+    const category = await this.categoryRepo.findOne({ where: { en_name } });
+    if (!category)
+      throw new NotFoundException(`دسته بندی "${en_name}" پیدا نشد`);
+
+    // گرفتن همه‌ی دسته‌های فرزند
+    const treeRepo = this.categoryRepo.manager.getTreeRepository(Category);
+    const descendants = await treeRepo.findDescendants(category);
+
+    const categoryIds = descendants.map((c) => c.id);
+
+    // گرفتن پست‌ها با صفحه‌بندی
+    const [posts, total] = await this.postRepo.findAndCount({
+      where: { category: In(categoryIds) },
+      relations: ['category', 'author', 'tags'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data: posts,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 }

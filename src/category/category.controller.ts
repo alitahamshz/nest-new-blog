@@ -40,9 +40,13 @@ export class CategoryController {
     return this.categoryService.findParents();
   }
   @Get('parents/posts/count')
-findParentCategoriesWithPostCount() {
-  return this.categoryService.findParentCategoriesWithPostCount();
-}
+  findParentCategoriesWithPostCount() {
+    return this.categoryService.findParentCategoriesWithPostCount();
+  }
+  @Get('find/route/:en_name')
+  findCategoryWithRoute(@Param('en_name') en_name: string) {
+    return this.categoryService.findCategoryRoute(en_name);
+  }
 }
 @ApiTags('admin/category')
 @Roles('admin')
