@@ -15,12 +15,14 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Request } from 'express';
+import { ApiBearerAuth } from '@nestjs/swagger';
 @Controller('comments')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @UseGuards(JwtAuthGuard) // 👈 فقط یوزر لاگین کرده می‌تونه کامنت بذاره
   @Post()
+  @ApiBearerAuth('access-token') // 👈 به Swagger میگه از توکن استفاده کن
   create(
     @Body() createCommentDto: CreateCommentDto,
     @Req() req: Request & { user: { id: number } },

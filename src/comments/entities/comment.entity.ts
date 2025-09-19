@@ -11,6 +11,11 @@ import {
 import { Post } from '../../posts/entities/post.entity';
 import { User } from '../../users/entities/user.entity';
 
+export enum CommentStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  REJECTED = 'rejected',
+}
 @Entity()
 export class Comment {
   @PrimaryGeneratedColumn()
@@ -19,6 +24,12 @@ export class Comment {
   @Column('text')
   content: string;
 
+  @Column({
+    type: 'enum',
+    enum: CommentStatus,
+    default: CommentStatus.PENDING,
+  })
+  status: CommentStatus;
   // کاربری که کامنت گذاشته
   @ManyToOne(() => User, (user) => user.comments, { onDelete: 'CASCADE' })
   author: User;
