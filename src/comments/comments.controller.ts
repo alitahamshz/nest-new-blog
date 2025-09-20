@@ -9,6 +9,8 @@ import {
   UseGuards,
   Req,
   Query,
+  UseInterceptors,
+  ClassSerializerInterceptor,
 } from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -23,6 +25,7 @@ export class CommentsController {
   @UseGuards(JwtAuthGuard) // 👈 فقط یوزر لاگین کرده می‌تونه کامنت بذاره
   @Post()
   @ApiBearerAuth('access-token') // 👈 به Swagger میگه از توکن استفاده کن
+  @UseInterceptors(ClassSerializerInterceptor)
   create(
     @Body() createCommentDto: CreateCommentDto,
     @Req() req: Request & { user: { id: number } },
@@ -33,21 +36,25 @@ export class CommentsController {
   }
 
   @Get()
+  @UseInterceptors(ClassSerializerInterceptor)
   findAll(@Query('postId') postId: number) {
     return this.commentsService.findAll(Number(postId));
   }
 
   @Get(':id')
+  @UseInterceptors(ClassSerializerInterceptor)
   findOne(@Param('id') id: string) {
     return this.commentsService.findOne(+id);
   }
 
   @Patch(':id')
+  @UseInterceptors(ClassSerializerInterceptor)
   update(@Param('id') id: string, @Body() updateCommentDto: UpdateCommentDto) {
     return this.commentsService.update(+id, updateCommentDto);
   }
 
   @Delete(':id')
+  @UseInterceptors(ClassSerializerInterceptor)
   remove(@Param('id') id: string) {
     return this.commentsService.remove(+id);
   }

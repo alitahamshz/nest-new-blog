@@ -12,6 +12,7 @@ import { Role } from '../../roles/entities/role.entity';
 import { Post } from 'src/posts/entities/post.entity';
 import { Comment } from 'src/comments/entities/comment.entity';
 import { UserProfile } from './user-profile.entity';
+import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class User {
@@ -21,6 +22,7 @@ export class User {
   @Column({ unique: true })
   email: string;
 
+  @Exclude()
   @Column()
   password: string; // بعدا هش میشه
 

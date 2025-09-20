@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
@@ -42,11 +42,34 @@ export class CommentsService {
     return this.commentsRepo.save(comment);
   }
 
-  async findAll(postId: number): Promise<Comment[]> {
-    return this.commentsRepo.find({
-      where: { post: { id: postId } },
-      relations: ['author', 'parent', 'children'],
+  async findAll(
+    postId: number,
+    page = 1,
+    limit = 10,
+  ): Promise<{ data: Comment[]; total: number; page: number; limit: number }> {
+    const [data, total] = await this.commentsRepo.findAndCount({
+      where: {
+        post: { id: postId },
+        parent: IsNull(), // فقط ریشه‌ها (کامنت‌های سطح بالا)
+      },
+      relations: [
+        'author',
+        'children',
+        'children.author',
+        'children.children',
+        'children.children.author',
+      ],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+    };
   }
 
   async findOne(id: number): Promise<Comment> {
