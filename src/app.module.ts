@@ -20,11 +20,11 @@ import { UserProfileModule } from './users/user-profile.module';
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost', // اگر داکر یا سرور داری اینو تغییر بده
-      port: 8000,
-      username: 'postgres', // یوزرنیم دیتابیس
-      password: '123456789', // پسورد دیتابیس
-      database: 'blog-db', // اسم دیتابیس
+      host: process.env.DB_HOST,
+      port:5432,
+      username: process.env.DB_USER, // یوزرنیم دیتابیس
+      password: process.env.DB_PASS, // پسورد دیتابیس
+      database: process.env.DB_NAME, // اسم دیتابیس
       autoLoadEntities: true, // همه‌ی Entity ها رو خودکار لود میکنه
       synchronize: false, // فقط در محیط توسعه فعال باشه
     }),

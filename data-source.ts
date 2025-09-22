@@ -11,11 +11,11 @@ import { Post } from './src/posts/entities/post.entity';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  host: 'localhost',
-  port: 8000,
-  username: 'postgres',
-  password: '123456789',
-  database: 'blog-db',
+  host: process.env.DB_HOST,
+  port: 5432,
+  username: process.env.DB_USER,
+  password: process.env.DB_PASS,
+  database: process.env.DB_NAME,
   entities: [Post, Category, Tag, User, Comment, Role, FileEntity, UserProfile],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
