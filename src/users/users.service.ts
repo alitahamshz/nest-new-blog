@@ -1,9 +1,11 @@
+/* eslint-disable prettier/prettier */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // user.service.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
-import { Role } from '../roles/entities/role.entity';
+import { User } from 'src/entities/user.entity';
+import { Role } from 'src/entities/role.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()

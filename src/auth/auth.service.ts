@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // auth.service.ts
 import {
   ConflictException,
@@ -8,8 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserService } from '../users/users.service';
 import { Repository } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
-import { Role } from 'src/roles/entities/role.entity';
+import { User } from 'src/entities/user.entity';
+import { Role } from 'src/entities/role.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()

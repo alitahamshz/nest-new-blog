@@ -1,17 +1,29 @@
-FROM node:20
-
+FROM node:20 AS builder
 WORKDIR /app
 
+# کپی فایل‌های package.json برای نصب پکیج‌ها
 COPY package*.json ./
-RUN npm install       # نصب همه پکیج‌ها (dev + prod)
+RUN npm install
 
+# کپی سورس پروژه و build
 COPY . .
+RUN npm run build
 
-RUN npm run build     # اجرا build با nest cli
+# مرحله production
+FROM node:20 AS production
+WORKDIR /app
 
-# حذف devDependencies بعد از build (اختیاری)
-RUN npm prune --production
+# فقط dependencyهای ضروری
+COPY package*.json ./
+RUN npm install --only=production
 
-CMD ["node", "dist/main"]
+# فقط خروجی build شده رو بیار
+COPY --from=builder /app/dist ./dist
+
+# اگر فایل‌های config (مثل .env) نیاز داری هم کپی کن
+COPY --from=builder /app/.env ./.env
+
 EXPOSE 5000
+CMD ["node", "dist/src/main.js"]
+
 

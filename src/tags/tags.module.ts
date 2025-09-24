@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { TagsService } from './tags.service';
 import { AdminTagsController, TagsController } from './tags.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Tag } from './entities/tag.entity';
-import { Post } from 'src/posts/entities/post.entity';
+import { Tag } from '../entities/tag.entity';
+import { Post } from 'src/entities/post.entity';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Tag, Post])],

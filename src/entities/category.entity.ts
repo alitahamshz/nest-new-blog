@@ -1,5 +1,5 @@
 // src/categories/category.entity.ts
-import { Post } from 'src/posts/entities/post.entity';
+import { Post } from 'src/entities/post.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,

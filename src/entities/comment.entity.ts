@@ -8,8 +8,8 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Post } from '../../posts/entities/post.entity';
-import { User } from '../../users/entities/user.entity';
+import { Post } from 'src/entities/post.entity';
+import { User } from 'src/entities/user.entity';
 
 export enum CommentStatus {
   PENDING = 'pending',
