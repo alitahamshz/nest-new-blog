@@ -1,29 +1,31 @@
+# ---- Builder Stage ----
 FROM node:20 AS builder
 WORKDIR /app
 
-# کپی فایل‌های package.json برای نصب پکیج‌ها
 COPY package*.json ./
 RUN npm install
 
-# کپی سورس پروژه و build
 COPY . .
 RUN npm run build
 
-# مرحله production
+# ---- Production Stage ----
 FROM node:20 AS production
 WORKDIR /app
 
-# فقط dependencyهای ضروری
 COPY package*.json ./
 RUN npm install --only=production
 
-# فقط خروجی build شده رو بیار
 COPY --from=builder /app/dist ./dist
+# Copy the entrypoint script into the production image
+COPY entrypoint.sh .
+# Make the script executable
+RUN chmod +x entrypoint.sh
 
-# اگر فایل‌های config (مثل .env) نیاز داری هم کپی کن
+# Copy your .env file
 COPY --from=builder /app/.env ./.env
 
 EXPOSE 5000
-CMD ["node", "dist/src/main.js"]
 
-
+# Set the entrypoint to be your script.
+# This will now run before the main application starts.
+ENTRYPOINT ["./entrypoint.sh"]
