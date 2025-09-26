@@ -6,7 +6,7 @@ import {
   IsString,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PostStatus } from '../entities/post.entity';
+import { PostStatus } from '../../entities/post.entity';
 
 export class UpdatePostDto {
   @ApiPropertyOptional({ example: 'یادگیری NestJS سطح پیشرفته' })

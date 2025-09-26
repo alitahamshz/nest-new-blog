@@ -1,4 +1,3 @@
-
 # ---- Builder Stage ----
 FROM node:20 AS builder
 WORKDIR /app
@@ -33,5 +32,4 @@ EXPOSE 5000
 # Set the entrypoint to be your script.
 # This will now run before the main application starts.
 ENTRYPOINT ["./entrypoint.sh"]
-
 

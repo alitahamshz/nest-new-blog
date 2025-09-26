@@ -1,8 +1,8 @@
 // src/posts/post.entity.ts
-import { Category } from 'src/category/entities/category.entity';
-import { Comment } from 'src/comments/entities/comment.entity';
-import { Tag } from 'src/tags/entities/tag.entity';
-import { User } from 'src/users/entities/user.entity';
+import { Category } from 'src/entities/category.entity';
+import { Comment } from 'src/entities/comment.entity';
+import { Tag } from 'src/entities/tag.entity';
+import { User } from 'src/entities/user.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,

@@ -21,7 +21,7 @@ import { UserProfileModule } from './users/user-profile.module';
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
-      port:5432,
+      port: 5432,
       username: process.env.DB_USER, // یوزرنیم دیتابیس
       password: process.env.DB_PASS, // پسورد دیتابیس
       database: process.env.DB_NAME, // اسم دیتابیس

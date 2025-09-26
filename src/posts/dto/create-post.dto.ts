@@ -7,7 +7,7 @@ import {
   IsString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PostStatus } from '../entities/post.entity';
+import { PostStatus } from '../../entities/post.entity';
 
 export class CreatePostDto {
   @ApiProperty({ example: 'یادگیری NestJS', description: 'عنوان پست' })

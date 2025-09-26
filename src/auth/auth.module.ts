@@ -8,8 +8,8 @@ import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from 'src/users/entities/user.entity';
-import { Role } from 'src/roles/entities/role.entity';
+import { User } from 'src/entities/user.entity';
+import { Role } from 'src/entities/role.entity';
 
 @Module({
   imports: [

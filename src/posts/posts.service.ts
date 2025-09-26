@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, IsNull } from 'typeorm';
-import { Post, PostStatus } from './entities/post.entity';
-import { Tag } from '../tags/entities/tag.entity';
-import { Category } from '../category/entities/category.entity';
-import { User } from '../users/entities/user.entity';
+import { Post, PostStatus } from '../entities/post.entity';
+import { Tag } from '../entities/tag.entity';
+import { Category } from '../entities/category.entity';
+import { User } from '../entities/user.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto } from './dto/filter-post.dto';

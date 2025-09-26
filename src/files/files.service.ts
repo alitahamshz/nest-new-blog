@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FileEntity } from './entities/file.entity';
+import { FileEntity } from '../entities/file.entity';
 import { unlinkSync } from 'fs';
 import { join } from 'path';
 

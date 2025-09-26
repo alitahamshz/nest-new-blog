@@ -8,10 +8,10 @@ import {
   OneToMany,
   OneToOne,
 } from 'typeorm';
-import { Role } from '../../roles/entities/role.entity';
-import { Post } from 'src/posts/entities/post.entity';
-import { Comment } from 'src/comments/entities/comment.entity';
-import { UserProfile } from './user-profile.entity';
+import { Role } from 'src/entities/role.entity';
+import { Post } from 'src/entities/post.entity';
+import { Comment } from 'src/entities/comment.entity';
+import { UserProfile } from 'src/entities/user-profile.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity('users')
@@ -29,13 +29,16 @@ export class User {
   @Column()
   name: string;
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @OneToOne(() => UserProfile, (profile) => profile.user, { cascade: true })
   profile: UserProfile;
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @ManyToMany(() => Role, (role) => role.users, { eager: true })
   @JoinTable() // فقط یک سمت نیاز داره
   roles: Role[];
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @OneToMany(() => Comment, (comment) => comment.author)
   comments: Comment[];
 

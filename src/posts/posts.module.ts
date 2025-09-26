@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Post } from './entities/post.entity';
-import { Tag } from 'src/tags/entities/tag.entity';
-import { User } from 'src/users/entities/user.entity';
-import { Category } from 'src/category/entities/category.entity';
+import { Post } from '../entities/post.entity';
+import { Tag } from 'src/entities/tag.entity';
+import { User } from 'src/entities/user.entity';
+import { Category } from 'src/entities/category.entity';
 import { AdminPostsController } from './adminPost.controller';
 
 @Module({
