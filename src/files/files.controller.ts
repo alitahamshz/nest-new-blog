@@ -18,7 +18,7 @@ function getUploadPath() {
   const now = new Date();
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  return `./uploads/${year}/${month}`;
+  return `/var/www/blog_uploads/${year}/${month}`; // مسیر واقعی
 }
 
 @Controller('files')

@@ -8,8 +8,11 @@ import { AllExceptionsFilter } from './common/interceptors/http-exception.filter
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/', // دسترسی فرانت به فایل‌ها
+  // app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  //   prefix: '/uploads/', // دسترسی فرانت به فایل‌ها
+  // });
+    app.useStaticAssets('/var/www/blog_uploads', {
+    prefix: '/uploads/', // URL عمومی: https://khoobit.ir/uploads/...
   });
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -32,6 +35,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document); // آدرس Swagger: /api-docs
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 5000);
 }
 bootstrap();

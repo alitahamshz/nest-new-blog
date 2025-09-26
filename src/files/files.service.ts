@@ -21,7 +21,7 @@ export class FilesService {
     const newFile = this.fileRepository.create({
       filename: file.filename,
       path: `uploads/${year}/${month}/${file.filename}`,
-      url: `http://localhost:3003/uploads/${year}/${month}/${file.filename}`, // بعداً میشه دامین اصلی
+      url: `https://khoobit.ir/uploads/${year}/${month}/${file.filename}`, // بعداً میشه دامین اصلی
       mimeType: file.mimetype,
       size: file.size,
     });
@@ -40,7 +40,7 @@ export class FilesService {
 
     // حذف از هارد
     try {
-      unlinkSync(join(process.cwd(), file.path));
+      unlinkSync(join('/var/www/blog_uploads', file.path)); //مسیر واقعی فایل ها
     } catch (err) {
       console.error('File delete error:', err.message);
     }
