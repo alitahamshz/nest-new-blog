@@ -16,7 +16,7 @@ async function bootstrap() {
   });
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.setGlobalPrefix('api', {
+  app.setGlobalPrefix('api/v1', {
     exclude: ['swagger'],
   });
   app.enableCors({
