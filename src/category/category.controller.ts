@@ -11,7 +11,7 @@ import {
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 // import { UpdateCategoryDto } from './dto/update-category.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Roles } from 'src/auth/guards/roles.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -51,6 +51,7 @@ export class CategoryController {
 @ApiTags('admin/category')
 @Roles('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth('access-token')
 @Controller('admin/category')
 export class AdminCategoryController {
   constructor(private readonly categoryService: CategoryService) {}

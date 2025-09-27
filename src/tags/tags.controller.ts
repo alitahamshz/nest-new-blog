@@ -14,6 +14,7 @@ import { UpdateTagDto } from './dto/update-tag.dto';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Roles } from 'src/auth/guards/roles.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('tags')
 export class TagsController {
@@ -29,8 +30,10 @@ export class TagsController {
     return this.tagsService.findOne(+id);
   }
 }
+
 @Roles('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiBearerAuth('access-token')
 @Controller('admin/tags')
 export class AdminTagsController {
   constructor(private readonly tagsService: TagsService) {}

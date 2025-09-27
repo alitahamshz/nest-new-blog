@@ -56,7 +56,6 @@ async function bootstrap() {
   // app.useStaticAssets('/var/www/blog_uploads', {
   //   prefix: '/uploads/',
   // });
-  
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
   app.setGlobalPrefix('api/v1', {
@@ -79,7 +78,6 @@ async function bootstrap() {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
-  
   await app.listen(process.env.PORT ?? 5000);
 }
 bootstrap();

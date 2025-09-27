@@ -16,8 +16,10 @@ import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { Roles } from 'src/auth/guards/roles.decorator';
 import { Request } from 'express';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 @Controller('comments')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
@@ -46,13 +48,17 @@ export class CommentsController {
   findOne(@Param('id') id: string) {
     return this.commentsService.findOne(+id);
   }
-
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Patch(':id')
+  @ApiBearerAuth('access-token')
   @UseInterceptors(ClassSerializerInterceptor)
   update(@Param('id') id: string, @Body() updateCommentDto: UpdateCommentDto) {
     return this.commentsService.update(+id, updateCommentDto);
   }
-
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':id')
   @UseInterceptors(ClassSerializerInterceptor)
   remove(@Param('id') id: string) {

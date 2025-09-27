@@ -61,8 +61,6 @@
 //   }
 // }
 
-
-
 // backend/src/files/files.controller.ts
 
 import {
@@ -73,13 +71,17 @@ import {
   Param,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { existsSync, mkdirSync } from 'fs';
+import { Roles } from 'src/auth/guards/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 
 // Get the base upload path from environment variables. Default to '/app/uploads' if not set.
 const UPLOAD_PATH_BASE = process.env.UPLOADS_DESTINATION || '/app/uploads';
@@ -89,6 +91,9 @@ const UPLOAD_PATH_BASE = process.env.UPLOADS_DESTINATION || '/app/uploads';
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('access-token')
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -97,7 +102,7 @@ export class FilesController {
           const now = new Date();
           const year = now.getFullYear();
           const month = (now.getMonth() + 1).toString().padStart(2, '0');
-          
+
           // Construct the full dynamic path
           const uploadPath = join(UPLOAD_PATH_BASE, year.toString(), month);
 
@@ -105,7 +110,7 @@ export class FilesController {
           if (!existsSync(uploadPath)) {
             mkdirSync(uploadPath, { recursive: true });
           }
-          
+
           cb(null, uploadPath);
         },
         filename: (req, file, cb) => {
@@ -126,6 +131,9 @@ export class FilesController {
     return this.filesService.findAll();
   }
 
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('access-token')
   @Delete(':id')
   async remove(@Param('id') id: number) {
     return this.filesService.remove(+id);
