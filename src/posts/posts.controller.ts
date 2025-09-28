@@ -58,4 +58,14 @@ export class PostsController {
   ) {
     return this.postsService.findPostsByCategoryEnName(en_name, query);
   }
+
+  @Get('slugs')
+  async getAllSlugs() {
+    const slugs = await this.postsService.findAllSlugs();
+    return {
+      success: true,
+      count: slugs.length,
+      data: slugs,
+    };
+  }
 }

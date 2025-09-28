@@ -245,41 +245,6 @@ export class PostsService {
       posts: posts.filter((p) => p.category?.en_name === name).slice(0, 10),
     }));
   }
-
-  // async findLast5PostsByParentCategories() {
-  //   // ۱. گرفتن همه‌ی دسته‌بندی‌های والد
-  //   const parentCategories = await this.categoryRepo.find({
-  //     where: { parent: IsNull() },
-  //   });
-
-  //   // ۲. گرفتن ۵ پست آخر برای هر دسته والد
-  //   const result: Record<string, Post[]> = {};
-  //   for (const parent of parentCategories) {
-  //     const posts = await this.postRepo.find({
-  //       where: { category: { id: parent.id } },
-  //       relations: ['category'],
-  //       order: { createdAt: 'DESC' },
-  //       take: 10,
-  //     });
-  //     result[parent.name || parent.slug] = posts;
-  //   }
-
-  //   return result;
-  // }
-
-  // async findBySlug(slug: string): Promise<Post> {
-  //   const post = await this.postRepo.findOne({
-  //     where: { slug },
-  //     relations: ['category'], // اگر میخوای دسته‌بندی هم بیاد
-  //   });
-
-  //   if (!post) {
-  //     throw new NotFoundException(`پست با slug "${slug}" پیدا نشد`);
-  //   }
-  //   // await this.postRepo.increment({ id }, 'view_count', 1);
-  //   return post;
-  // }
-
   async findLast5PostsByParentCategories() {
     // ۱. گرفتن همه‌ی دسته‌های والد
     const parentCategories = await this.categoryRepo.find({
@@ -354,33 +319,6 @@ export class PostsService {
     };
   }
 
-  // async findPostsByCategoryEnName(
-  //   en_name: string,
-  //   { page = 1, limit = 10 }: PaginateByCategoryDto,
-  // ) {
-  //   const category = await this.categoryRepo.findOne({ where: { en_name } });
-  //   if (!category) {
-  //     throw new NotFoundException(`دسته بندی با en_name "${en_name}" پیدا نشد`);
-  //   }
-
-  //   const [posts, total] = await this.postRepo.findAndCount({
-  //     where: { category: { id: category.id } },
-  //     relations: ['category', 'author', 'tags'],
-  //     order: { createdAt: 'DESC' },
-  //     skip: (page - 1) * limit,
-  //     take: limit,
-  //   });
-
-  //   return {
-  //     data: posts,
-  //     meta: {
-  //       total,
-  //       page,
-  //       limit,
-  //       totalPages: Math.ceil(total / limit),
-  //     },
-  //   };
-  // }
   async findPostsByCategoryEnName(
     en_name: string,
     { page = 1, limit = 10 }: PaginateByCategoryDto,
@@ -414,5 +352,12 @@ export class PostsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findAllSlugs(): Promise<{ slug: string }[]> {
+    return this.postRepo.find({
+      select: ['slug'], // فقط فیلد slug
+      order: { createdAt: 'DESC' }, // اختیاری، اگه می‌خوای مرتب باشه
+    });
   }
 }
