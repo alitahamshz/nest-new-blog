@@ -1,0 +1,3 @@
+    "migration:generate": "npm run typeorm:ts -- migration:generate ./src/migrations/Init",
+    "migration:run": "npm run typeorm:ts -- migration:run",
+    "migration:revert": "npm run typeorm:ts -- migration:revert"

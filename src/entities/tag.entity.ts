@@ -1,6 +1,7 @@
 // src/tags/tag.entity.ts
 import { Entity, PrimaryGeneratedColumn, Column, ManyToMany } from 'typeorm';
 import { Post } from './post.entity';
+import { Product } from './product.entity';
 
 @Entity('tags')
 export class Tag {
@@ -18,4 +19,7 @@ export class Tag {
 
   @ManyToMany(() => Post, (post) => post.tags)
   posts: Post[];
+
+  @ManyToMany(() => Product, (product) => product.tags)
+  products: Product[];
 }

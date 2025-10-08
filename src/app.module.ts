@@ -12,6 +12,14 @@ import { ConfigModule } from '@nestjs/config';
 import { FilesModule } from './files/files.module';
 import { CommentsModule } from './comments/comments.module';
 import { UserProfileModule } from './users/user-profile.module';
+import { ProductsModule } from './products/products.module';
+import { SellerModule } from './seller/seller.module';
+import { ProductImagesModule } from './product_images/product_images.module';
+import { ProductCategoriesModule } from './product-categories/product-categories.module';
+import { SellerOfferModule } from './seller-offer/seller-offer.module';
+import { AttributeModule } from './attribute/attribute.module';
+import { AttributeValueModule } from './attribute-value/attribute-value.module';
+import { ProductVariantModule } from './product-variant/product-variant.module';
 
 @Module({
   imports: [
@@ -37,6 +45,14 @@ import { UserProfileModule } from './users/user-profile.module';
     FilesModule,
     CommentsModule,
     UserProfileModule,
+    ProductsModule,
+    SellerModule,
+    ProductImagesModule,
+    ProductCategoriesModule,
+    SellerOfferModule,
+    AttributeModule,
+    AttributeValueModule,
+    ProductVariantModule,
   ],
   controllers: [AppController],
   providers: [AppService],

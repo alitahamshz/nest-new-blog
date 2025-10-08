@@ -9,7 +9,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Category } from './category.entity';
+import { ProductCategory } from './product-category.entity';
 import { Tag } from './tag.entity';
 import { Attribute } from './attribute.entity';
 import { ProductVariant } from './product-variant.entity';
@@ -30,6 +30,9 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   description: string;
 
+  @Column({ type: 'text', nullable: true })
+  metaDescription: string;
+
   @Column({ nullable: true })
   sku: string; // کد محصول (جهت انبارداری)
 
@@ -39,8 +42,10 @@ export class Product {
   @Column({ default: false })
   hasVariant: boolean;
 
-  @ManyToOne(() => Category, (category) => category.products, { eager: true })
-  category: Category;
+  @ManyToOne(() => ProductCategory, (category) => category.products, {
+    eager: true,
+  })
+  category: ProductCategory;
 
   @ManyToMany(() => Tag, (tag) => tag.products, { cascade: true })
   @JoinTable()

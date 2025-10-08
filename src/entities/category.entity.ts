@@ -36,4 +36,5 @@ export class Category {
   // 🟢 one-to-many with posts
   @OneToMany(() => Post, (post) => post.category)
   posts: Post[];
+  products: any;
 }

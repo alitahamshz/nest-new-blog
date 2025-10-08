@@ -9,9 +9,9 @@ import {
 } from 'typeorm';
 import { Product } from './product.entity';
 
-@Entity('categories')
+@Entity('product_categories')
 @Tree('closure-table')
-export class Category {
+export class ProductCategory {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -25,10 +25,10 @@ export class Category {
   icon: string;
 
   @TreeChildren()
-  children: Category[];
+  children: ProductCategory[];
 
   @TreeParent()
-  parent: Category;
+  parent: ProductCategory;
 
   @OneToMany(() => Product, (product) => product.category)
   products: Product[];
