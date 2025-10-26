@@ -11,6 +11,7 @@ import { Role } from 'src/entities/role.entity';
 import { Post } from 'src/entities/post.entity';
 import { Comment } from 'src/entities/comment.entity';
 import { UserProfile } from 'src/entities/user-profile.entity';
+import { Seller } from 'src/entities/seller.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity('users')
@@ -44,4 +45,8 @@ export class User {
   // ارتباط با پست‌ها
   @OneToMany(() => Post, (post) => post.author)
   posts: Post[];
+
+  // ارتباط با فروشنده (اختیاری - اگر کاربر فروشنده باشه)
+  @OneToOne(() => Seller, (seller) => seller.user)
+  seller: Seller;
 }

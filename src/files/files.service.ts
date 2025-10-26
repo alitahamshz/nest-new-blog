@@ -50,7 +50,6 @@
 //   }
 // }
 
-
 // backend/src/files/files.service.ts
 
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -67,9 +66,14 @@ export class FilesService {
     private readonly fileRepository: Repository<FileEntity>,
   ) {}
 
-  async saveFile(file: Express.Multer.File, basePath: string): Promise<FileEntity> {
+  async saveFile(
+    file: Express.Multer.File,
+    basePath: string,
+  ): Promise<FileEntity> {
     // Get relative path: e.g., '2023/12/image.jpg'
-    const relativePath = file.path.replace(basePath + '/', '').replace(/\\/g, '/');
+    const relativePath = file.path
+      .replace(basePath + '/', '')
+      .replace(/\\/g, '/');
 
     const newFile = this.fileRepository.create({
       filename: file.filename,

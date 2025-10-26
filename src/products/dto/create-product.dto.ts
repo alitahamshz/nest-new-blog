@@ -4,8 +4,11 @@ import {
   IsOptional,
   IsBoolean,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { CreateProductSpecificationDto } from '../../product-specification/dto';
 
 export class CreateProductDto {
   @ApiProperty({ description: 'نام محصول' })
@@ -55,13 +58,15 @@ export class CreateProductDto {
   tagIds?: number[];
 
   @ApiProperty({
-    description: 'لیست شناسه ویژگی‌ها',
-    type: [Number],
+    description: 'مشخصات فنی محصول (ویژگی‌های ثابت)',
+    type: [CreateProductSpecificationDto],
     required: false,
   })
   @IsArray()
   @IsOptional()
-  attributeIds?: number[];
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductSpecificationDto)
+  specifications?: CreateProductSpecificationDto[];
 
   @ApiProperty({
     description: 'لیست URL های تصاویر گالری',

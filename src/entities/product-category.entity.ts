@@ -28,7 +28,7 @@ export class ProductCategory {
   children: ProductCategory[];
 
   @TreeParent()
-  parent: ProductCategory;
+  parent: ProductCategory | null;
 
   @OneToMany(() => Product, (product) => product.category)
   products: Product[];

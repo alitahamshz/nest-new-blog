@@ -22,11 +22,20 @@ export class SellerOffer {
   @Column('decimal', { precision: 12, scale: 2 })
   price: number;
 
+  @Column('decimal', { precision: 12, scale: 2 })
+  discountPrice: number;
+
   @Column({ default: 0 })
   stock: number;
 
   @Column({ nullable: true })
   discountPercent: number;
+
+  @Column('boolean', { nullable: true })
+  hasWarranty: boolean;
+
+  @Column('varchar', { nullable: true })
+  warrantyDescription: string;
 
   @Column({ default: false })
   isDefault: boolean;

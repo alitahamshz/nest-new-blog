@@ -17,9 +17,8 @@ import { SellerModule } from './seller/seller.module';
 import { ProductImagesModule } from './product_images/product_images.module';
 import { ProductCategoriesModule } from './product-categories/product-categories.module';
 import { SellerOfferModule } from './seller-offer/seller-offer.module';
-import { AttributeModule } from './attribute/attribute.module';
-import { AttributeValueModule } from './attribute-value/attribute-value.module';
 import { ProductVariantModule } from './product-variant/product-variant.module';
+import { ProductSpecificationModule } from './product-specification/product-specification.module';
 
 @Module({
   imports: [
@@ -50,9 +49,8 @@ import { ProductVariantModule } from './product-variant/product-variant.module';
     ProductImagesModule,
     ProductCategoriesModule,
     SellerOfferModule,
-    AttributeModule,
-    AttributeValueModule,
     ProductVariantModule,
+    ProductSpecificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

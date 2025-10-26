@@ -11,10 +11,10 @@ import {
 } from 'typeorm';
 import { ProductCategory } from './product-category.entity';
 import { Tag } from './tag.entity';
-import { Attribute } from './attribute.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductImage } from './product-image.entity';
 import { SellerOffer } from './seller-offer.entity';
+import { ProductSpecification } from './product-specification.entity';
 
 @Entity('products')
 export class Product {
@@ -51,9 +51,12 @@ export class Product {
   @JoinTable()
   tags: Tag[];
 
-  @ManyToMany(() => Attribute, { eager: true })
-  @JoinTable()
-  attributes: Attribute[];
+  @OneToMany(
+    () => ProductSpecification,
+    (specification) => specification.product,
+    { cascade: true },
+  )
+  specifications: ProductSpecification[];
 
   @OneToMany(() => ProductVariant, (variant) => variant.product)
   variants: ProductVariant[];
