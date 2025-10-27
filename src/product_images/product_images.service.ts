@@ -9,6 +9,9 @@ import { ProductImage } from '../entities/product-image.entity';
 import { Product } from '../entities/product.entity';
 import { CreateProductImageDto } from './dto/create-product_image.dto';
 import { UpdateProductImageDto } from './dto/update-product_image.dto';
+import { FilesService } from '../files/files.service';
+import { unlinkSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class ProductImagesService {
@@ -17,6 +20,7 @@ export class ProductImagesService {
     private readonly imageRepo: Repository<ProductImage>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -183,6 +187,26 @@ export class ProductImagesService {
   async remove(id: number): Promise<void> {
     const image = await this.findOne(id);
 
+    // حذف فایل فیزیکی از دیسک
+    try {
+      const uploadPathBase = process.env.UPLOADS_DESTINATION || '/app/uploads';
+      // استخراج path نسبی از URL
+      // مثال: از "http://localhost:3000/uploads/2025/01/product-123.jpg"
+      // به "2025/01/product-123.jpg"
+      const urlPath = new URL(image.url).pathname; // "/uploads/2025/01/product-123.jpg"
+      const relativePath = urlPath.replace('/uploads/', ''); // "2025/01/product-123.jpg"
+      const fullPath = join(uploadPathBase, relativePath);
+
+      unlinkSync(fullPath);
+      console.log(`✅ فایل حذف شد: ${fullPath}`);
+    } catch (err) {
+      console.error(
+        'خطا در حذف فایل:',
+        err instanceof Error ? err.message : String(err),
+      );
+      // ادامه می‌دهیم حتی اگر فایل پیدا نشد
+    }
+
     // اگر تصویر اصلی بود، اولین تصویر دیگر را اصلی کن
     if (image.isMain) {
       const otherImages = await this.imageRepo.find({
@@ -204,6 +228,113 @@ export class ProductImagesService {
    * حذف تمام تصاویر یک محصول
    */
   async removeByProduct(productId: number): Promise<void> {
+    // ابتدا تمام تصاویر رو بگیر
+    const images = await this.imageRepo.find({
+      where: { product: { id: productId } },
+    });
+
+    // حذف فیزیکی تمام فایل‌ها
+    const uploadPathBase = process.env.UPLOADS_DESTINATION || '/app/uploads';
+    for (const image of images) {
+      try {
+        const urlPath = new URL(image.url).pathname;
+        const relativePath = urlPath.replace('/uploads/', '');
+        const fullPath = join(uploadPathBase, relativePath);
+
+        unlinkSync(fullPath);
+        console.log(`✅ فایل حذف شد: ${fullPath}`);
+      } catch (err) {
+        console.error(
+          `خطا در حذف فایل ${image.url}:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
+    // حذف از دیتابیس
     await this.imageRepo.delete({ product: { id: productId } });
+  }
+
+  /**
+   * آپلود و ذخیره تصویر محصول
+   */
+  async uploadImage(
+    productId: number,
+    file: Express.Multer.File,
+    isMain: boolean = false,
+  ): Promise<ProductImage> {
+    // بررسی وجود محصول
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`محصول با شناسه ${productId} یافت نشد`);
+    }
+
+    // ذخیره فایل با استفاده از FilesService
+    const uploadedFile = await this.filesService.saveFile(
+      file,
+      process.env.UPLOADS_DESTINATION || '/app/uploads',
+    );
+
+    // اگر isMain = true باشه، تمام تصاویر قبلی رو غیر اصلی کن
+    if (isMain) {
+      await this.imageRepo.update(
+        { product: { id: productId }, isMain: true },
+        { isMain: false },
+      );
+    }
+
+    // ایجاد ProductImage
+    const productImage = this.imageRepo.create({
+      product,
+      url: uploadedFile.url,
+      alt: file.originalname,
+      isMain: isMain,
+    });
+
+    return await this.imageRepo.save(productImage);
+  }
+
+  /**
+   * آپلود چندین تصویر یکجا
+   */
+  async uploadMultipleImages(
+    productId: number,
+    files: Express.Multer.File[],
+  ): Promise<ProductImage[]> {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+    });
+    if (!product) {
+      throw new NotFoundException(`محصول با شناسه ${productId} یافت نشد`);
+    }
+
+    const uploadedImages: ProductImage[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+
+      // ذخیره فایل
+      const uploadedFile = await this.filesService.saveFile(
+        file,
+        process.env.UPLOADS_DESTINATION || '/app/uploads',
+      );
+
+      // اولین تصویر رو اصلی کن (اگر محصول تصویر اصلی نداره)
+      const existingMain = await this.findMainImage(productId);
+      const isMain = i === 0 && !existingMain;
+
+      const productImage = this.imageRepo.create({
+        product,
+        url: uploadedFile.url,
+        alt: file.originalname,
+        isMain: isMain,
+      });
+
+      uploadedImages.push(await this.imageRepo.save(productImage));
+    }
+
+    return uploadedImages;
   }
 }

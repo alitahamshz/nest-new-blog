@@ -103,7 +103,10 @@ export class FilesService {
     try {
       unlinkSync(fullPath);
     } catch (err) {
-      console.error('File delete error:', err.message);
+      console.error(
+        'File delete error:',
+        err instanceof Error ? err.message : String(err),
+      );
       // You might not want to throw an error here, just log it.
     }
 

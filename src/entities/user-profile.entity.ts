@@ -5,8 +5,10 @@ import {
   Column,
   OneToOne,
   JoinColumn,
+  OneToMany,
 } from 'typeorm';
 import { User } from 'src/entities/user.entity';
+import { Address } from './address.entity';
 
 @Entity()
 export class UserProfile {
@@ -31,4 +33,30 @@ export class UserProfile {
 
   @Column({ nullable: true })
   socialLinks: string; // می‌تونی JSON هم استفاده کنی
+
+  // ========== اطلاعات تماس و آدرس ==========
+  @Column({ nullable: true })
+  phone: string; // شماره تلفن اصلی
+
+  @Column({ nullable: true })
+  alternativePhone: string; // شماره تماس جایگزین
+
+  @Column({ type: 'text', nullable: true })
+  address: string; // آدرس کامل
+
+  @Column({ nullable: true })
+  city: string; // شهر
+
+  @Column({ nullable: true })
+  province: string; // استان
+
+  @Column({ nullable: true })
+  postalCode: string; // کد پستی
+
+  @Column({ nullable: true })
+  nationalId: string; // کد ملی (برای احراز هویت)
+
+  // ========== رابطه با آدرس‌ها ==========
+  @OneToMany(() => Address, (address) => address.userProfile)
+  addresses: Address[];
 }
