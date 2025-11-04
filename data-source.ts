@@ -20,7 +20,7 @@ export const AppDataSource = new DataSource({
   migrations: [
     process.env.NODE_ENV === 'production'
       ? 'dist/src/migrations/*.js'
-      : 'src/migrations/*.ts',
+      : 'src/migrations/*.{ts,js}',
   ],
 
   synchronize: false,
