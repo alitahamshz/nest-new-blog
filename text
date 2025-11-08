@@ -1,3 +1,9 @@
     "migration:generate": "npm run typeorm:ts -- migration:generate ./src/migrations/Init",
     "migration:run": "npm run typeorm:ts -- migration:run",
     "migration:revert": "npm run typeorm:ts -- migration:revert"
+
+        "typeorm:ts": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d data-source.ts",
+    "typeorm:js": "node ./node_modules/typeorm/cli.js -d dist/data-source.js",
+    "migration:generate": "npm run typeorm:ts -- migration:generate",
+    "migration:run": "npm run typeorm:js -- migration:run",
+    "migration:revert": "npm run typeorm:js -- migration:revert"

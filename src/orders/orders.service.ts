@@ -3,8 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, Between, DataSource } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { User } from '../entities/user.entity';
@@ -17,6 +17,8 @@ import { OrderStatus, PaymentStatus } from '../entities/order.enums';
 @Injectable()
 export class OrdersService {
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderItem)
@@ -42,103 +44,116 @@ export class OrdersService {
       throw new NotFoundException('کاربر یافت نشد');
     }
 
-    // دریافت سبد خرید
-    const cart = await this.cartRepo.findOne({
-      where: { user: { id: createDto.userId } },
-      relations: ['items', 'items.offer', 'items.product', 'items.variant'],
-    });
+    // Use a QueryRunner transaction and pessimistic locking to avoid oversell
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (!cart || cart.items.length === 0) {
-      throw new BadRequestException('سبد خرید خالی است');
-    }
-
-    // بررسی موجودی و فعال بودن پیشنهادات
-    for (const item of cart.items) {
-      const offer = await this.offerRepo.findOne({
-        where: { id: item.offer.id },
-        relations: ['seller'],
+    try {
+      const cart = await queryRunner.manager.findOne(Cart, {
+        where: { user: { id: createDto.userId } },
+        relations: ['items', 'items.offer', 'items.product', 'items.variant'],
       });
 
-      if (!offer || !offer.isActive) {
-        throw new BadRequestException(
-          `پیشنهاد ${item.product.name} دیگر فعال نیست`,
-        );
+      if (!cart || cart.items.length === 0) {
+        throw new BadRequestException('سبد خرید خالی است');
       }
 
-      if (offer.stock < item.quantity) {
-        throw new BadRequestException(
-          `موجودی ${item.product.name} کافی نیست. موجودی فعلی: ${offer.stock}`,
-        );
+      // تولید شماره سفارش یونیک
+      const orderNumber = await this.generateOrderNumber();
+
+      let subtotal = 0;
+      const orderItems: OrderItem[] = [];
+
+      for (const cartItem of cart.items) {
+        // Lock only the offer row to avoid PostgreSQL FOR UPDATE limitation with LEFT JOIN
+        const lockedOffer = await queryRunner.manager
+          .createQueryBuilder(SellerOffer, 'offer')
+          .setLock('pessimistic_write')
+          .where('offer.id = :id', { id: cartItem.offer.id })
+          .getOne();
+
+        if (!lockedOffer || !lockedOffer.isActive) {
+          throw new BadRequestException(
+            `پیشنهاد ${cartItem.product.name} دیگر فعال نیست`,
+          );
+        }
+
+        // Load relations after locking (row is already locked)
+        const offer = await queryRunner.manager.findOne(SellerOffer, {
+          where: { id: lockedOffer.id },
+          relations: ['seller', 'product', 'variant'],
+        });
+
+        if (!offer) {
+          throw new BadRequestException('پیشنهاد یافت نشد');
+        }
+
+        if (offer.stock < cartItem.quantity) {
+          throw new BadRequestException(
+            `موجودی ${cartItem.product.name} کافی نیست. موجودی فعلی: ${offer.stock}`,
+          );
+        }
+
+        const itemSubtotal = cartItem.price * cartItem.quantity;
+        subtotal += itemSubtotal;
+
+        const orderItem = queryRunner.manager.create(OrderItem, {
+          product: cartItem.product,
+          variant: cartItem.variant,
+          seller: offer.seller,
+          offer: offer,
+          productName: cartItem.product.name,
+          variantName: cartItem.variant?.name || undefined,
+          sellerBusinessName: offer.seller.businessName,
+          quantity: cartItem.quantity,
+          price: cartItem.price,
+          subtotal: itemSubtotal,
+          discount: 0,
+          total: itemSubtotal,
+        });
+
+        orderItems.push(orderItem);
+
+        offer.stock -= cartItem.quantity;
+        await queryRunner.manager.save(offer);
       }
-    }
 
-    // تولید شماره سفارش یونیک
-    const orderNumber = await this.generateOrderNumber();
+      const shippingCost = this.calculateShippingCost(subtotal);
+      const tax = this.calculateTax(subtotal);
+      const total = subtotal + shippingCost + tax;
 
-    // محاسبه قیمت‌ها
-    let subtotal = 0;
-    const orderItems: OrderItem[] = [];
-
-    for (const cartItem of cart.items) {
-      const offer = await this.offerRepo.findOne({
-        where: { id: cartItem.offer.id },
-        relations: ['seller', 'product', 'variant'],
-      });
-
-      const itemSubtotal = cartItem.price * cartItem.quantity;
-      subtotal += itemSubtotal;
-
-      const orderItem = this.orderItemRepo.create({
-        product: cartItem.product,
-        variant: cartItem.variant,
-        seller: offer!.seller,
-        offer: offer!,
-        productName: cartItem.product.name,
-        variantName: cartItem.variant?.name || undefined,
-        sellerBusinessName: offer!.seller.businessName,
-        quantity: cartItem.quantity,
-        price: cartItem.price,
-        subtotal: itemSubtotal,
+      const order = queryRunner.manager.create(Order, {
+        orderNumber,
+        user,
+        items: orderItems,
+        subtotal,
+        shippingCost,
         discount: 0,
-        total: itemSubtotal,
+        tax,
+        total,
+        status: OrderStatus.PENDING,
+        paymentMethod: createDto.paymentMethod,
+        paymentStatus: PaymentStatus.PENDING,
+        shippingAddress: createDto.shippingAddress || '',
+        shippingPhone: createDto.shippingPhone,
+        recipientName: createDto.recipientName,
+        customerNote: createDto.customerNote,
       });
 
-      orderItems.push(orderItem);
+      const savedOrder = await queryRunner.manager.save(order);
 
-      // کاهش موجودی
-      offer!.stock -= cartItem.quantity;
-      await this.offerRepo.save(offer!);
+      // remove cart inside transaction
+      await queryRunner.manager.remove(cart);
+
+      await queryRunner.commitTransaction();
+      return savedOrder;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    const shippingCost = this.calculateShippingCost(subtotal);
-    const tax = this.calculateTax(subtotal);
-    const total = subtotal + shippingCost + tax;
-
-    // ایجاد سفارش
-    const order = this.orderRepo.create({
-      orderNumber,
-      user,
-      items: orderItems,
-      subtotal,
-      shippingCost,
-      discount: 0,
-      tax,
-      total,
-      status: OrderStatus.PENDING,
-      paymentMethod: createDto.paymentMethod,
-      paymentStatus: PaymentStatus.PENDING,
-      shippingAddress: createDto.shippingAddress || '',
-      shippingPhone: createDto.shippingPhone,
-      recipientName: createDto.recipientName,
-      customerNote: createDto.customerNote,
-    });
-
-    const savedOrder = await this.orderRepo.save(order);
-
-    // خالی کردن سبد خرید
-    await this.cartRepo.remove(cart);
-
-    return savedOrder;
   }
 
   /**
@@ -166,71 +181,96 @@ export class OrdersService {
     const orderItems: OrderItem[] = [];
 
     // ایجاد آیتم‌های سفارش
-    for (const item of createDto.items) {
-      const offer = await this.offerRepo.findOne({
-        where: { id: item.offerId },
-        relations: ['seller', 'product', 'variant'],
-      });
+    // For direct order creation, run within a transaction and lock offers
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-      if (!offer || !offer.isActive) {
-        throw new BadRequestException('پیشنهاد یافت نشد یا غیرفعال است');
+    try {
+      for (const item of createDto.items) {
+        // Lock only the offer row to avoid PostgreSQL FOR UPDATE limitation with LEFT JOIN
+        const lockedOffer = await queryRunner.manager
+          .createQueryBuilder(SellerOffer, 'offer')
+          .setLock('pessimistic_write')
+          .where('offer.id = :id', { id: item.offerId })
+          .getOne();
+
+        if (!lockedOffer || !lockedOffer.isActive) {
+          throw new BadRequestException('پیشنهاد یافت نشد یا غیرفعال است');
+        }
+
+        // Load relations after locking (won't lock these relations, but row is already locked)
+        const offer = await queryRunner.manager.findOne(SellerOffer, {
+          where: { id: lockedOffer.id },
+          relations: ['seller', 'product', 'variant'],
+        });
+
+        if (!offer) {
+          throw new BadRequestException('پیشنهاد یافت نشد');
+        }
+
+        if (offer.stock < item.quantity) {
+          throw new BadRequestException(
+            `موجودی کافی نیست. موجودی فعلی: ${offer.stock}`,
+          );
+        }
+
+        const itemSubtotal = offer.discountPrice * item.quantity;
+        subtotal += itemSubtotal;
+
+        const orderItem = queryRunner.manager.create(OrderItem, {
+          product: offer.product,
+          variant: offer.variant,
+          seller: offer.seller,
+          offer,
+          productName: offer.product.name,
+          variantName: offer.variant?.name || undefined,
+          sellerBusinessName: offer.seller.businessName,
+          quantity: item.quantity,
+          price: offer.discountPrice,
+          subtotal: itemSubtotal,
+          discount: 0,
+          total: itemSubtotal,
+        });
+
+        orderItems.push(orderItem);
+
+        // decrease stock inside transaction
+        offer.stock -= item.quantity;
+        await queryRunner.manager.save(offer);
       }
 
-      if (offer.stock < item.quantity) {
-        throw new BadRequestException(
-          `موجودی کافی نیست. موجودی فعلی: ${offer.stock}`,
-        );
-      }
+      const shippingCost = this.calculateShippingCost(subtotal);
+      const tax = this.calculateTax(subtotal);
+      const total = subtotal + shippingCost + tax;
 
-      const itemSubtotal = offer.discountPrice * item.quantity;
-      subtotal += itemSubtotal;
-
-      const orderItem = this.orderItemRepo.create({
-        product: offer.product,
-        variant: offer.variant,
-        seller: offer.seller,
-        offer,
-        productName: offer.product.name,
-        variantName: offer.variant?.name || undefined,
-        sellerBusinessName: offer.seller.businessName,
-        quantity: item.quantity,
-        price: offer.discountPrice,
-        subtotal: itemSubtotal,
+      const order = queryRunner.manager.create(Order, {
+        orderNumber,
+        user,
+        items: orderItems,
+        subtotal,
+        shippingCost,
         discount: 0,
-        total: itemSubtotal,
+        tax,
+        total,
+        status: OrderStatus.PENDING,
+        paymentMethod: createDto.paymentMethod,
+        paymentStatus: PaymentStatus.PENDING,
+        shippingAddress: createDto.shippingAddress || '',
+        shippingPhone: createDto.shippingPhone,
+        recipientName: createDto.recipientName,
+        customerNote: createDto.customerNote,
       });
 
-      orderItems.push(orderItem);
-
-      // کاهش موجودی
-      offer.stock -= item.quantity;
-      await this.offerRepo.save(offer);
+      const saved = await queryRunner.manager.save(order);
+      await queryRunner.commitTransaction();
+      return saved;
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    const shippingCost = this.calculateShippingCost(subtotal);
-    const tax = this.calculateTax(subtotal);
-    const total = subtotal + shippingCost + tax;
-
-    // ایجاد سفارش
-    const order = this.orderRepo.create({
-      orderNumber,
-      user,
-      items: orderItems,
-      subtotal,
-      shippingCost,
-      discount: 0,
-      tax,
-      total,
-      status: OrderStatus.PENDING,
-      paymentMethod: createDto.paymentMethod,
-      paymentStatus: PaymentStatus.PENDING,
-      shippingAddress: createDto.shippingAddress || '',
-      shippingPhone: createDto.shippingPhone,
-      recipientName: createDto.recipientName,
-      customerNote: createDto.customerNote,
-    });
-
-    return await this.orderRepo.save(order);
   }
 
   /**
