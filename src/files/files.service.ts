@@ -85,6 +85,29 @@ export class FilesService {
     return this.fileRepository.save(newFile);
   }
 
+  /**
+   * Save file with local path (for development/testing)
+   * Stores files in project's uploads/ folder with correct relative paths
+   */
+  async saveFileLocal(
+    file: Express.Multer.File,
+    basePath: string,
+  ): Promise<FileEntity> {
+    // Extract relative path from full path (e.g., 'uploads/2025/11/filename.jpg')
+    const relativePath = file.path
+      .replace(basePath, 'uploads')
+      .replace(/\\/g, '/');
+
+    const newFile = this.fileRepository.create({
+      filename: file.filename,
+      path: relativePath,
+      url: `${process.env.APP_URL}/${relativePath}`, // Local URL without double /uploads
+      mimeType: file.mimetype,
+      size: file.size,
+    });
+    return this.fileRepository.save(newFile);
+  }
+
   async findAll(): Promise<FileEntity[]> {
     return this.fileRepository.find({
       order: { createdAt: 'DESC' },

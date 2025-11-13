@@ -45,17 +45,20 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { TransformInterceptor } from './common/interceptors/transform.interceptors';
 import { AllExceptionsFilter } from './common/interceptors/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // === THIS LINE IS REMOVED ===
-  // Nginx will now be responsible for serving static files.
-  // app.useStaticAssets('/var/www/blog_uploads', {
-  //   prefix: '/uploads/',
-  // });
+  // Serve local uploads folder in development
+  if (process.env.NODE_ENV !== 'production') {
+    app.useStaticAssets(join(process.cwd(), 'uploads'), {
+      prefix: '/uploads',
+    });
+  }
+
   app.useGlobalInterceptors(new TransformInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
   app.setGlobalPrefix('api/v1', {

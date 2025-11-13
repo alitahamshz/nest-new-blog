@@ -138,4 +138,46 @@ export class FilesController {
   async remove(@Param('id') id: number) {
     return this.filesService.remove(+id);
   }
+
+  /**
+   * Upload file to local uploads directory (for development/testing)
+   * Stores files in the project's uploads/ folder instead of Docker path
+   */
+  @Post('upload-local')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = (now.getMonth() + 1).toString().padStart(2, '0');
+
+          // Use project root uploads folder for local development
+          const localUploadPath = join(
+            process.cwd(),
+            'uploads',
+            year.toString(),
+            month,
+          );
+
+          // Create directory if it doesn't exist
+          if (!existsSync(localUploadPath)) {
+            mkdirSync(localUploadPath, { recursive: true });
+          }
+
+          cb(null, localUploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, uniqueSuffix + extname(file.originalname));
+        },
+      }),
+    }),
+  )
+  async uploadFileLocal(@UploadedFile() file: Express.Multer.File) {
+    // Pass cwd uploads path for local storage
+    const localBasePath = join(process.cwd(), 'uploads');
+    return await this.filesService.saveFileLocal(file, localBasePath);
+  }
 }
