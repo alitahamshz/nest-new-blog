@@ -52,7 +52,7 @@ export class OrdersService {
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
         where: { user: { id: createDto.userId } },
-        relations: ['items', 'items.offer', 'items.product', 'items.variant'],
+        relations: ['items', 'items.offer', 'items.product', 'items.variantValues'],
       });
 
       if (!cart || cart.items.length === 0) {
@@ -82,7 +82,7 @@ export class OrdersService {
         // Load relations after locking (row is already locked)
         const offer = await queryRunner.manager.findOne(SellerOffer, {
           where: { id: lockedOffer.id },
-          relations: ['seller', 'product', 'variant'],
+          relations: ['seller', 'product', 'variantValues'],
         });
 
         if (!offer) {
@@ -100,11 +100,13 @@ export class OrdersService {
 
         const orderItem = queryRunner.manager.create(OrderItem, {
           product: cartItem.product,
-          variant: cartItem.variant,
+          variantValues: cartItem.variantValues,
           seller: offer.seller,
           offer: offer,
           productName: cartItem.product.name,
-          variantName: cartItem.variant?.name || undefined,
+          variantValueNames: cartItem.variantValues
+            ? cartItem.variantValues.map((v) => v.name).join(' - ')
+            : undefined,
           sellerBusinessName: offer.seller.businessName,
           quantity: cartItem.quantity,
           price: cartItem.price,
@@ -202,7 +204,7 @@ export class OrdersService {
         // Load relations after locking (won't lock these relations, but row is already locked)
         const offer = await queryRunner.manager.findOne(SellerOffer, {
           where: { id: lockedOffer.id },
-          relations: ['seller', 'product', 'variant'],
+          relations: ['seller', 'product', 'variantValues'],
         });
 
         if (!offer) {
@@ -220,11 +222,13 @@ export class OrdersService {
 
         const orderItem = queryRunner.manager.create(OrderItem, {
           product: offer.product,
-          variant: offer.variant,
+          variantValues: offer.variantValues,
           seller: offer.seller,
           offer,
           productName: offer.product.name,
-          variantName: offer.variant?.name || undefined,
+          variantValueNames: offer.variantValues
+            ? offer.variantValues.map((v) => v.name).join(' - ')
+            : undefined,
           sellerBusinessName: offer.seller.businessName,
           quantity: item.quantity,
           price: offer.discountPrice,

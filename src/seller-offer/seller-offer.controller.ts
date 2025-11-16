@@ -78,14 +78,14 @@ export class SellerOfferController {
   }
 
   @Get('variant/:variantId')
-  @ApiOperation({ summary: 'دریافت پیشنهادات یک واریانت' })
-  @ApiParam({ name: 'variantId', description: 'شناسه واریانت' })
+  @ApiOperation({ summary: 'دریافت پیشنهادات حاوی یک variant value' })
+  @ApiParam({ name: 'variantId', description: 'شناسه variant value' })
   @ApiResponse({
     status: 200,
-    description: 'لیست پیشنهادات واریانت (مرتب شده بر اساس قیمت)',
+    description: 'لیست پیشنهادات (مرتب شده بر اساس قیمت)',
   })
-  async findByVariant(@Param('variantId', ParseIntPipe) variantId: number) {
-    return await this.sellerOfferService.findByVariant(variantId);
+  async findByVariantValue(@Param('variantId', ParseIntPipe) variantValueId: number) {
+    return await this.sellerOfferService.findByVariantValue(variantValueId);
   }
 
   @Get('best-offer')
@@ -96,21 +96,25 @@ export class SellerOfferController {
     description: 'شناسه محصول',
   })
   @ApiQuery({
-    name: 'variantId',
+    name: 'variantValueIds',
     required: false,
-    description: 'شناسه واریانت',
+    description: 'شناسه‌های variant values (کاما‌جدا‌شده)',
   })
   @ApiResponse({
     status: 200,
-    description: 'بهترین پیشنهاد برای محصول یا واریانت',
+    description: 'بهترین پیشنهاد برای محصول یا variant values',
   })
   async findBestOffer(
     @Query('productId') productId?: string,
-    @Query('variantId') variantId?: string,
+    @Query('variantValueIds') variantValueIds?: string,
   ) {
+    const variantValueIdsArray = variantValueIds
+      ? variantValueIds.split(',').map((id) => +id)
+      : undefined;
+
     return await this.sellerOfferService.findBestOffer(
       productId ? +productId : undefined,
-      variantId ? +variantId : undefined,
+      variantValueIdsArray,
     );
   }
 

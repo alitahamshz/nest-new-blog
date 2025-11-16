@@ -12,6 +12,7 @@ import {
 import { ProductCategory } from './product-category.entity';
 import { Tag } from './tag.entity';
 import { ProductVariant } from './product-variant.entity';
+import { ProductVariantValue } from './product-variant-value.entity';
 import { ProductImage } from './product-image.entity';
 import { SellerOffer } from './seller-offer.entity';
 import { ProductSpecification } from './product-specification.entity';
@@ -60,6 +61,9 @@ export class Product {
 
   @OneToMany(() => ProductVariant, (variant) => variant.product)
   variants: ProductVariant[];
+
+  @OneToMany(() => ProductVariantValue, (value) => value.product)
+  variantValues: ProductVariantValue[];
 
   @OneToMany(() => ProductImage, (image) => image.product, { cascade: true })
   gallery: ProductImage[];

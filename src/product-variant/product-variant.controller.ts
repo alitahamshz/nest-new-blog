@@ -33,20 +33,6 @@ export class ProductVariantController {
     return await this.productVariantService.create(createDto);
   }
 
-  @Post('batch/:productId')
-  @ApiOperation({ summary: 'ایجاد چندین واریانت یکجا برای یک محصول' })
-  @ApiParam({ name: 'productId', description: 'شناسه محصول' })
-  @ApiResponse({
-    status: 201,
-    description: 'واریانت‌ها با موفقیت ایجاد شدند',
-  })
-  async createMany(
-    @Param('productId') productId: string,
-    @Body() createDtos: CreateProductVariantDto[],
-  ) {
-    return await this.productVariantService.createMany(+productId, createDtos);
-  }
-
   @Get()
   @ApiOperation({ summary: 'دریافت تمام واریانت‌ها' })
   @ApiResponse({

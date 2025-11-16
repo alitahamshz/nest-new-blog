@@ -18,6 +18,7 @@ import { ProductImagesModule } from './product_images/product_images.module';
 import { ProductCategoriesModule } from './product-categories/product-categories.module';
 import { SellerOfferModule } from './seller-offer/seller-offer.module';
 import { ProductVariantModule } from './product-variant/product-variant.module';
+import { ProductVariantValueModule } from './product-variant-value/product-variant-value.module';
 import { ProductSpecificationModule } from './product-specification/product-specification.module';
 import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
@@ -52,6 +53,7 @@ import { OrdersModule } from './orders/orders.module';
     ProductCategoriesModule,
     SellerOfferModule,
     ProductVariantModule,
+    ProductVariantValueModule,
     ProductSpecificationModule,
     CartModule,
     OrdersModule,

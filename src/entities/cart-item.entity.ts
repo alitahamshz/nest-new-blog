@@ -3,12 +3,14 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  ManyToMany,
+  JoinTable,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Cart } from './cart.entity';
 import { Product } from './product.entity';
-import { ProductVariant } from './product-variant.entity';
+import { ProductVariantValue } from './product-variant-value.entity';
 import { SellerOffer } from './seller-offer.entity';
 
 @Entity('cart_items')
@@ -22,8 +24,13 @@ export class CartItem {
   @ManyToOne(() => Product, { nullable: false })
   product: Product;
 
-  @ManyToOne(() => ProductVariant, { nullable: true })
-  variant: ProductVariant | null;
+  @ManyToMany(() => ProductVariantValue, { nullable: true })
+  @JoinTable({
+    name: 'cart_item_variant_values',
+    joinColumn: { name: 'cartItemId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'variantValueId', referencedColumnName: 'id' },
+  })
+  variantValues: ProductVariantValue[] | null;
 
   @ManyToOne(() => SellerOffer, { nullable: false })
   offer: SellerOffer;

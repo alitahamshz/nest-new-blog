@@ -34,7 +34,7 @@ export class CartService {
       relations: [
         'items',
         'items.product',
-        'items.variant',
+        'items.variantValues',
         'items.offer',
         'items.offer.seller',
       ],
@@ -82,9 +82,7 @@ export class CartService {
 
     // بررسی اینکه آیا این آیتم قبلاً در سبد وجود دارد
     const existingItem = cart.items.find(
-      (item) =>
-        item.offer.id === dto.offerId &&
-        (dto.variantId ? item.variant?.id === dto.variantId : true),
+      (item) => item.offer.id === dto.offerId,
     );
 
     if (existingItem) {
@@ -104,7 +102,7 @@ export class CartService {
       const cartItem = this.cartItemRepo.create({
         cart,
         product: offer.product,
-        variant: offer.variant,
+        variantValues: offer.variantValues,
         offer,
         quantity: dto.quantity,
         price: offer.discountPrice,

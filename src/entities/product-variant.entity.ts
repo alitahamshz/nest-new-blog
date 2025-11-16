@@ -6,7 +6,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { Product } from './product.entity';
-import { SellerOffer } from './seller-offer.entity';
+import { ProductVariantValue } from './product-variant-value.entity';
 
 @Entity('product_variants')
 export class ProductVariant {
@@ -19,14 +19,19 @@ export class ProductVariant {
   product: Product;
 
   @Column()
-  name: string; // مثلاً رنگ یا سایز
+  name: string; // نام نوع تنوع: رنگ، اندازه، ...
 
-  @Column()
-  value: string; // مثلاً "قرمز" یا "XL"
+  @Column({ nullable: true })
+  icon: string; // آیکن تنوع
+
+  @Column({ nullable: true })
+  image: string; // تصویر تنوع
 
   @Column({ nullable: true })
   sku: string; // کد خاص برای واریانت
 
-  @OneToMany(() => SellerOffer, (offer) => offer.variant)
-  offers: SellerOffer[];
+  @OneToMany(() => ProductVariantValue, (value) => value.variant, {
+    cascade: true,
+  })
+  values: ProductVariantValue[];
 }

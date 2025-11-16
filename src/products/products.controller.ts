@@ -8,8 +8,16 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
+  ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -38,13 +46,26 @@ export class ProductsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'دریافت لیست تمام محصولات' })
+  @ApiOperation({ summary: 'دریافت لیست تمام محصولات با صفحه‌بندی' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'شماره صفحه (پیش‌فرض: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'تعداد اقلام در هر صفحه (پیش‌فرض: 10)',
+  })
   @ApiResponse({
     status: 200,
-    description: 'لیست محصولات',
+    description: 'لیست محصولات با صفحه‌بندی',
   })
-  async findAll() {
-    return await this.productsService.findAll();
+  async findAll(
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return await this.productsService.findAll(page || 1, limit || 10);
   }
 
   @Get('category/:categoryId')

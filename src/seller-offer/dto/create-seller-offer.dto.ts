@@ -7,6 +7,7 @@ import {
   Min,
   Max,
   ValidateIf,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -19,21 +20,22 @@ export class CreateSellerOfferDto {
   @IsNumber({}, { message: 'شناسه فروشنده باید عدد باشد' })
   sellerId: number;
 
-  @ApiPropertyOptional({
-    description: 'شناسه محصول (برای محصول بدون واریانت)',
+  @ApiProperty({
+    description: 'شناسه محصول',
     example: 1,
   })
-  @IsOptional()
+  @IsNotEmpty({ message: 'شناسه محصول الزامی است' })
   @IsNumber({}, { message: 'شناسه محصول باید عدد باشد' })
-  productId?: number;
+  productId: number;
 
   @ApiPropertyOptional({
-    description: 'شناسه واریانت محصول (برای محصول با واریانت)',
-    example: 1,
+    description: 'شناسه‌های مقادیر واریانت (برای محصول با واریانت)',
+    example: [1, 2],
   })
   @IsOptional()
-  @IsNumber({}, { message: 'شناسه واریانت باید عدد باشد' })
-  variantId?: number;
+  @IsArray({ message: 'مقادیر واریانت باید آرایه باشند' })
+  @IsNumber({}, { each: true, message: 'هر شناسه واریانت باید عدد باشد' })
+  variantValueIds?: number[];
 
   @ApiProperty({
     description: 'قیمت پایه محصول',

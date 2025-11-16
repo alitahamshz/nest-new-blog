@@ -5,7 +5,45 @@ import {
   IsNumber,
   IsOptional,
   MaxLength,
+  ValidateNested,
+  IsArray,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class CreateProductVariantValueInlineDto {
+  @ApiProperty({
+    description: 'نام مقدار تنوع (مثلاً سبز، قرمز، S، XL)',
+    example: 'قرمز',
+  })
+  @IsNotEmpty({ message: 'نام مقدار الزامی است' })
+  @IsString({ message: 'نام مقدار باید رشته باشد' })
+  @MaxLength(100)
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'آیکن مقدار',
+    example: 'http://localhost:5000/uploads/2025/11/icon.png',
+  })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiPropertyOptional({
+    description: 'تصویر مقدار',
+    example: 'http://localhost:5000/uploads/2025/11/color.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  image?: string;
+
+  @ApiPropertyOptional({
+    description: 'کد رنگ (برای رنگ‌ها)',
+    example: '#FF0000',
+  })
+  @IsOptional()
+  @IsString()
+  hexCode?: string;
+}
 
 export class CreateProductVariantDto {
   @ApiProperty({
@@ -17,29 +55,45 @@ export class CreateProductVariantDto {
   productId: number;
 
   @ApiProperty({
-    description: 'نام ویژگی (مثلاً رنگ، سایز)',
+    description: 'نام نوع تنوع (مثلاً رنگ، سایز)',
     example: 'رنگ',
   })
-  @IsNotEmpty({ message: 'نام ویژگی الزامی است' })
-  @IsString({ message: 'نام ویژگی باید رشته باشد' })
-  @MaxLength(100, { message: 'نام ویژگی نباید بیشتر از 100 کاراکتر باشد' })
+  @IsNotEmpty({ message: 'نام تنوع الزامی است' })
+  @IsString({ message: 'نام تنوع باید رشته باشد' })
+  @MaxLength(100)
   name: string;
 
-  @ApiProperty({
-    description: 'مقدار ویژگی (مثلاً قرمز، XL)',
-    example: 'قرمز',
+  @ApiPropertyOptional({
+    description: 'آیکن نوع تنوع',
+    example: 'http://localhost:5000/uploads/2025/11/color-icon.png',
   })
-  @IsNotEmpty({ message: 'مقدار ویژگی الزامی است' })
-  @IsString({ message: 'مقدار ویژگی باید رشته باشد' })
-  @MaxLength(100, { message: 'مقدار ویژگی نباید بیشتر از 100 کاراکتر باشد' })
-  value: string;
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiPropertyOptional({
+    description: 'تصویر نوع تنوع',
+    example: 'http://localhost:5000/uploads/2025/11/color-image.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  image?: string;
 
   @ApiPropertyOptional({
     description: 'کد SKU واریانت',
-    example: 'TSHIRT-RED-XL',
+    example: 'COLOR',
   })
   @IsOptional()
-  @IsString({ message: 'SKU باید رشته باشد' })
-  @MaxLength(50, { message: 'SKU نباید بیشتر از 50 کاراکتر باشد' })
+  @IsString()
+  @MaxLength(50)
   sku?: string;
+
+  @ApiProperty({
+    description: 'مقادیر نوع تنوع',
+    type: [CreateProductVariantValueInlineDto],
+  })
+  @IsArray({ message: 'مقادیر باید آرایه باشند' })
+  @ValidateNested({ each: true })
+  @Type(() => CreateProductVariantValueInlineDto)
+  values: CreateProductVariantValueInlineDto[];
 }

@@ -3,11 +3,13 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  ManyToMany,
+  JoinTable,
   CreateDateColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
 import { Product } from './product.entity';
-import { ProductVariant } from './product-variant.entity';
+import { ProductVariantValue } from './product-variant-value.entity';
 import { Seller } from './seller.entity';
 import { SellerOffer } from './seller-offer.entity';
 
@@ -22,8 +24,13 @@ export class OrderItem {
   @ManyToOne(() => Product, { nullable: false })
   product: Product;
 
-  @ManyToOne(() => ProductVariant, { nullable: true })
-  variant: ProductVariant | null;
+  @ManyToMany(() => ProductVariantValue, { nullable: true })
+  @JoinTable({
+    name: 'order_item_variant_values',
+    joinColumn: { name: 'orderItemId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'variantValueId', referencedColumnName: 'id' },
+  })
+  variantValues: ProductVariantValue[] | null;
 
   @ManyToOne(() => Seller, { nullable: false })
   seller: Seller;
@@ -36,7 +43,7 @@ export class OrderItem {
   productName: string;
 
   @Column({ nullable: true })
-  variantName: string; // مثل: "رنگ: مشکی"
+  variantValueNames: string; // مثل: "رنگ: مشکی - اندازه: L"
 
   @Column()
   sellerBusinessName: string;

@@ -5,11 +5,11 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { SellerOffer } from '../entities/seller-offer.entity';
 import { Seller } from '../entities/seller.entity';
 import { Product } from '../entities/product.entity';
-import { ProductVariant } from '../entities/product-variant.entity';
+import { ProductVariantValue } from '../entities/product-variant-value.entity';
 import { CreateSellerOfferDto } from './dto/create-seller-offer.dto';
 import { UpdateSellerOfferDto } from './dto/update-seller-offer.dto';
 
@@ -22,8 +22,8 @@ export class SellerOfferService {
     private readonly sellerRepo: Repository<Seller>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
-    @InjectRepository(ProductVariant)
-    private readonly variantRepo: Repository<ProductVariant>,
+    @InjectRepository(ProductVariantValue)
+    private readonly variantValueRepo: Repository<ProductVariantValue>,
   ) {}
 
   /**
@@ -45,73 +45,106 @@ export class SellerOfferService {
       throw new BadRequestException('فروشنده غیرفعال است');
     }
 
-    // باید حداقل یکی از productId یا variantId وجود داشته باشد
-    if (!createDto.productId && !createDto.variantId) {
-      throw new BadRequestException(
-        'باید حداقل یکی از productId یا variantId مشخص شود',
+    // محصول الزامی است
+    if (!createDto.productId) {
+      throw new BadRequestException('productId الزامی است');
+    }
+
+    // بررسی وجود محصول
+    const product = await this.productRepo.findOne({
+      where: { id: createDto.productId },
+      relations: ['variants', 'variantValues'],
+    });
+
+    if (!product) {
+      throw new NotFoundException(
+        `محصول با شناسه ${createDto.productId} یافت نشد`,
       );
     }
 
-    let product: Product | null = null;
-    let variant: ProductVariant | null = null;
+    // بررسی تناسب variantValueIds با محصول
+    let variantValues: ProductVariantValue[] = [];
 
-    // بررسی وجود محصول
-    if (createDto.productId) {
-      product = await this.productRepo.findOne({
-        where: { id: createDto.productId },
+    if (createDto.variantValueIds && createDto.variantValueIds.length > 0) {
+      // اگر variantValueIds ارسال شد
+      if (!product.hasVariant) {
+        throw new BadRequestException(
+          'این محصول واریانت ندارد. variantValueIds را حذف کنید',
+        );
+      }
+
+      // تمام variant value IDs باید به این محصول تعلق داشته باشند
+      variantValues = await this.variantValueRepo.find({
+        where: { id: In(createDto.variantValueIds) },
+        relations: ['variant'],
       });
 
-      if (!product) {
+      if (variantValues.length !== createDto.variantValueIds.length) {
         throw new NotFoundException(
-          `محصول با شناسه ${createDto.productId} یافت نشد`,
+          'یکی یا بیشتر از variant value ID نامعتبر است',
         );
       }
 
-      // اگر محصول واریانت دارد، باید variantId هم ارسال شود
-      if (product.hasVariant && !createDto.variantId) {
+      // بررسی اینکه تمام variant values به همان محصول تعلق دارند
+      const productVariantIds = product.variants.map((v) => v.id);
+      const invalidValues = variantValues.filter(
+        (vv) => !productVariantIds.includes(vv.variant.id),
+      );
+
+      if (invalidValues.length > 0) {
         throw new BadRequestException(
-          'این محصول دارای واریانت است. لطفاً variantId را نیز مشخص کنید',
+          'تمام variant values باید به واریانت‌های محصول تعلق داشته باشند',
         );
       }
-
-      // اگر محصول واریانت ندارد، نباید variantId ارسال شود
-      if (!product.hasVariant && createDto.variantId) {
+    } else {
+      // اگر variantValueIds ارسال نشد
+      if (product.hasVariant) {
         throw new BadRequestException(
-          'این محصول واریانت ندارد. variantId را حذف کنید',
+          'این محصول دارای واریانت است. لطفاً variantValueIds را مشخص کنید',
         );
       }
-    }
-
-    // بررسی وجود واریانت
-    if (createDto.variantId) {
-      variant = await this.variantRepo.findOne({
-        where: { id: createDto.variantId },
-        relations: ['product'],
-      });
-
-      if (!variant) {
-        throw new NotFoundException(
-          `واریانت با شناسه ${createDto.variantId} یافت نشد`,
-        );
-      }
-
-      product = variant.product;
     }
 
     // بررسی تکراری نبودن پیشنهاد
-    const existingOffer = await this.offerRepo.findOne({
-      where: {
-        seller: { id: createDto.sellerId },
-        ...(variant
-          ? { variant: { id: variant.id } }
-          : { product: { id: product!.id } }),
-      },
-    });
+    // برای محصولات بدون واریانت
+    if (!product.hasVariant) {
+      const existingOffer = await this.offerRepo.findOne({
+        where: {
+          seller: { id: createDto.sellerId },
+          product: { id: product.id },
+        },
+      });
 
-    if (existingOffer) {
-      throw new ConflictException(
-        'این فروشنده قبلاً برای این محصول/واریانت پیشنهاد ثبت کرده است',
-      );
+      if (existingOffer) {
+        throw new ConflictException(
+          'این فروشنده قبلاً برای این محصول پیشنهاد ثبت کرده است',
+        );
+      }
+    } else {
+      // برای محصولات با واریانت - بررسی ترکیب variant values
+      const existingOffer = await this.offerRepo
+        .createQueryBuilder('offer')
+        .where('offer.sellerId = :sellerId', {
+          sellerId: createDto.sellerId,
+        })
+        .andWhere('offer.productId = :productId', {
+          productId: product.id,
+        })
+        .leftJoinAndSelect(
+          'offer.variantValues',
+          'variantValues',
+          'variantValues.id IN (:...variantValueIds)',
+          {
+            variantValueIds: createDto.variantValueIds || [],
+          },
+        )
+        .getOne();
+
+      if (existingOffer) {
+        throw new ConflictException(
+          'این فروشنده قبلاً برای این ترکیب محصول/واریانت پیشنهاد ثبت کرده است',
+        );
+      }
     }
 
     // محاسبه قیمت تخفیف‌خورده اگر درصد تخفیف داده شده
@@ -124,8 +157,8 @@ export class SellerOfferService {
     // ایجاد پیشنهاد
     const offer = this.offerRepo.create({
       seller: { id: seller.id },
-      product: product ? { id: product.id } : undefined,
-      variant: variant ? { id: variant.id } : undefined,
+      product: { id: product.id },
+      variantValues: variantValues.length > 0 ? variantValues : [],
       price: createDto.price,
       discountPrice,
       discountPercent: createDto.discountPercent || 0,
@@ -143,7 +176,12 @@ export class SellerOfferService {
    */
   async findAll(): Promise<SellerOffer[]> {
     return await this.offerRepo.find({
-      relations: ['seller', 'product', 'variant'],
+      relations: [
+        'seller',
+        'product',
+        'variantValues',
+        'variantValues.variant',
+      ],
       order: { discountPrice: 'ASC' },
     });
   }
@@ -154,7 +192,7 @@ export class SellerOfferService {
   async findBySeller(sellerId: number): Promise<SellerOffer[]> {
     return await this.offerRepo.find({
       where: { seller: { id: sellerId }, isActive: true },
-      relations: ['product', 'variant'],
+      relations: ['product', 'variantValues', 'variantValues.variant'],
       order: { discountPrice: 'ASC' },
     });
   }
@@ -165,20 +203,24 @@ export class SellerOfferService {
   async findByProduct(productId: number): Promise<SellerOffer[]> {
     return await this.offerRepo.find({
       where: { product: { id: productId }, isActive: true },
-      relations: ['seller', 'variant'],
+      relations: ['seller', 'variantValues', 'variantValues.variant'],
       order: { discountPrice: 'ASC' },
     });
   }
 
   /**
-   * دریافت پیشنهادات یک واریانت
+   * دریافت پیشنهادات حاوی یک variant value
    */
-  async findByVariant(variantId: number): Promise<SellerOffer[]> {
-    return await this.offerRepo.find({
-      where: { variant: { id: variantId }, isActive: true },
-      relations: ['seller', 'product'],
-      order: { discountPrice: 'ASC' },
-    });
+  async findByVariantValue(variantValueId: number): Promise<SellerOffer[]> {
+    return await this.offerRepo
+      .createQueryBuilder('offer')
+      .innerJoinAndSelect('offer.variantValues', 'variantValues')
+      .where('variantValues.id = :variantValueId', { variantValueId })
+      .andWhere('offer.isActive = :isActive', { isActive: true })
+      .leftJoinAndSelect('offer.seller', 'seller')
+      .leftJoinAndSelect('offer.product', 'product')
+      .orderBy('offer.discountPrice', 'ASC')
+      .getMany();
   }
 
   /**
@@ -186,34 +228,35 @@ export class SellerOfferService {
    */
   async findBestOffer(
     productId?: number,
-    variantId?: number,
+    variantValueIds?: number | number[],
   ): Promise<SellerOffer | null> {
-    interface WhereCondition {
-      isActive: boolean;
-      variant?: { id: number };
-      product?: { id: number };
-    }
+    let query = this.offerRepo
+      .createQueryBuilder('offer')
+      .where('offer.isActive = :isActive', { isActive: true })
+      .andWhere('offer.stock > 0')
+      .leftJoinAndSelect('offer.seller', 'seller')
+      .leftJoinAndSelect('offer.product', 'product')
+      .leftJoinAndSelect('offer.variantValues', 'variantValues');
 
-    const where: WhereCondition = { isActive: true };
+    const variantValueIdsArray = Array.isArray(variantValueIds)
+      ? variantValueIds
+      : variantValueIds
+        ? [variantValueIds]
+        : undefined;
 
-    if (variantId) {
-      where.variant = { id: variantId };
+    if (variantValueIdsArray && variantValueIdsArray.length > 0) {
+      query = query.andWhere('variantValues.id IN (:...variantValueIds)', {
+        variantValueIds: variantValueIdsArray,
+      });
     } else if (productId) {
-      where.product = { id: productId };
+      query = query.andWhere('offer.productId = :productId', { productId });
     } else {
       throw new BadRequestException(
-        'باید حداقل یکی از productId یا variantId مشخص شود',
+        'باید حداقل یکی از productId یا variantValueIds مشخص شود',
       );
     }
 
-    return await this.offerRepo.findOne({
-      where: {
-        ...where,
-        stock: MoreThan(0), // فقط موجودی‌های موجود
-      },
-      relations: ['seller', 'product', 'variant'],
-      order: { discountPrice: 'ASC' },
-    });
+    return await query.orderBy('offer.discountPrice', 'ASC').getOne();
   }
 
   /**
@@ -222,13 +265,17 @@ export class SellerOfferService {
   async findOne(id: number): Promise<SellerOffer> {
     const offer = await this.offerRepo.findOne({
       where: { id },
-      relations: ['seller', 'product', 'variant'],
+      relations: [
+        'seller',
+        'product',
+        'variantValues',
+        'variantValues.variant',
+      ],
     });
 
     if (!offer) {
       throw new NotFoundException(`پیشنهاد با شناسه ${id} یافت نشد`);
     }
-
     return offer;
   }
 

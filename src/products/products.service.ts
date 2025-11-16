@@ -108,13 +108,37 @@ export class ProductsService {
   }
 
   /**
-   * دریافت لیست محصولات
+   * دریافت لیست محصولات با صفحه‌بندی
    */
-  async findAll(): Promise<Product[]> {
-    return await this.productRepo.find({
-      relations: ['category', 'tags', 'specifications', 'gallery'],
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const [products, total] = await this.productRepo.findAndCount({
+      relations: [
+        'category',
+        'tags',
+        'specifications',
+        'gallery',
+        'variants',
+        'variants.values',
+      ],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data: products,
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -129,6 +153,8 @@ export class ProductsService {
         'specifications',
         'gallery',
         'variants',
+        'variants.values',
+        'variantValues',
         'offers',
       ],
     });
@@ -152,6 +178,8 @@ export class ProductsService {
         'specifications',
         'gallery',
         'variants',
+        'variants.values',
+        'variantValues',
         'offers',
       ],
     });
@@ -292,7 +320,7 @@ export class ProductsService {
   async findByCategory(categoryId: number): Promise<Product[]> {
     return await this.productRepo.find({
       where: { category: { id: categoryId }, isActive: true },
-      relations: ['category', 'tags', 'gallery'],
+      relations: ['category', 'tags', 'gallery', 'variants', 'variants.values'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -303,7 +331,7 @@ export class ProductsService {
   async findByTag(tagId: number): Promise<Product[]> {
     return await this.productRepo.find({
       where: { tags: { id: tagId }, isActive: true },
-      relations: ['category', 'tags', 'gallery'],
+      relations: ['category', 'tags', 'gallery', 'variants', 'variants.values'],
       order: { createdAt: 'DESC' },
     });
   }

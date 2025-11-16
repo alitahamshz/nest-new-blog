@@ -1,6 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  ManyToMany,
+  JoinTable,
+} from 'typeorm';
 import { Product } from './product.entity';
-import { ProductVariant } from './product-variant.entity';
+import { ProductVariantValue } from './product-variant-value.entity';
 import { Seller } from './seller.entity';
 
 @Entity('seller_offers')
@@ -11,13 +18,16 @@ export class SellerOffer {
   @ManyToOne(() => Seller, (seller) => seller.offers)
   seller: Seller;
 
-  @ManyToOne(() => Product, (product) => product.offers, { nullable: true })
+  @ManyToOne(() => Product, (product) => product.offers)
   product: Product;
 
-  @ManyToOne(() => ProductVariant, (variant) => variant.offers, {
-    nullable: true,
+  @ManyToMany(() => ProductVariantValue, { eager: true })
+  @JoinTable({
+    name: 'offer_variant_values',
+    joinColumn: { name: 'offer_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'variant_value_id', referencedColumnName: 'id' },
   })
-  variant: ProductVariant;
+  variantValues: ProductVariantValue[];
 
   @Column('decimal', { precision: 12, scale: 2 })
   price: number;
