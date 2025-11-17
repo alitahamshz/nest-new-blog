@@ -49,6 +49,15 @@ export class UpdatePostDto {
   @IsArray()
   tags?: number[];
 
+  @ApiPropertyOptional({
+    example: [1, 2, 3],
+    description: 'آی‌دی محصولات مرتبط',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  productIds?: number[];
+
   @ApiPropertyOptional({ example: 2 })
   @IsOptional()
   @IsNumber()

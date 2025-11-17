@@ -96,6 +96,15 @@ export class CreatePostDto {
   category_id?: number;
 
   @ApiPropertyOptional({
+    example: [1, 2, 3],
+    description: 'آی‌دی محصولات مرتبط',
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray()
+  productIds?: number[];
+
+  @ApiPropertyOptional({
     enum: PostStatus,
     example: PostStatus.DRAFT,
     description: 'وضعیت مقاله (draft | published | pending)',

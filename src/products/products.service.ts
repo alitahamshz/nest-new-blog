@@ -108,36 +108,63 @@ export class ProductsService {
   }
 
   /**
-   * دریافت لیست محصولات با صفحه‌بندی
+   * دریافت لیست محصولات با صفحه‌بندی و فیلتر
    */
   async findAll(
     page: number = 1,
     limit: number = 10,
+    search?: string,
+    categoryId?: number,
+    isActive?: boolean,
   ): Promise<{
     data: Product[];
     total: number;
     page: number;
     limit: number;
+    totalPages: number;
   }> {
-    const [products, total] = await this.productRepo.findAndCount({
-      relations: [
-        'category',
-        'tags',
-        'specifications',
-        'gallery',
-        'variants',
-        'variants.values',
-      ],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const query = this.productRepo.createQueryBuilder('product');
+
+    // روابط
+    query.leftJoinAndSelect('product.category', 'category');
+    query.leftJoinAndSelect('product.tags', 'tags');
+    query.leftJoinAndSelect('product.specifications', 'specifications');
+    query.leftJoinAndSelect('product.gallery', 'gallery');
+    query.leftJoinAndSelect('product.variants', 'variants');
+    query.leftJoinAndSelect('variants.values', 'variantValues');
+
+    // جستجو در نام و کد محصول
+    if (search) {
+      query.where(
+        '(LOWER(product.name) LIKE LOWER(:search) OR LOWER(product.sku) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
+    }
+
+    // فیلتر بر اساس دسته
+    if (categoryId) {
+      query.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+
+    // فیلتر بر اساس وضعیت
+    if (isActive !== undefined) {
+      query.andWhere('product.isActive = :isActive', { isActive });
+    }
+
+    // ترتیب و صفحه‌بندی
+    query.orderBy('product.createdAt', 'DESC');
+    query.skip((page - 1) * limit);
+    query.take(limit);
+
+    const [products, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
 
     return {
       data: products,
       total,
       page,
       limit,
+      totalPages,
     };
   }
 
@@ -291,9 +318,13 @@ export class ProductsService {
   /**
    * حذف محصول
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number): Promise<{ message: string; success: boolean }> {
     const product = await this.findOne(id);
     await this.productRepo.remove(product);
+    return {
+      message: `محصول با شناسه ${id} با موفقیت حذف شد`,
+      success: true,
+    };
   }
 
   /**

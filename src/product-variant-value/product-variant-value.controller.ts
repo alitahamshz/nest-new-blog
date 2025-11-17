@@ -90,11 +90,11 @@ export class ProductVariantValueController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'حذف مقدار' })
   @ApiParam({ name: 'id', description: 'شناسه مقدار' })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: 'مقدار با موفقیت حذف شد',
   })
   @ApiResponse({
@@ -102,6 +102,6 @@ export class ProductVariantValueController {
     description: 'مقدار یافت نشد',
   })
   async remove(@Param('id') id: string) {
-    await this.variantValueService.remove(+id);
+    return await this.variantValueService.remove(+id);
   }
 }

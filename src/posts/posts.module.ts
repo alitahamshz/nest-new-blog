@@ -7,9 +7,10 @@ import { Tag } from 'src/entities/tag.entity';
 import { User } from 'src/entities/user.entity';
 import { Category } from 'src/entities/category.entity';
 import { AdminPostsController } from './adminPost.controller';
+import { Product } from 'src/entities/product.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Post, Tag, User, Category])],
+  imports: [TypeOrmModule.forFeature([Post, Tag, User, Category, Product])],
   controllers: [PostsController, AdminPostsController],
   providers: [PostsService],
 })

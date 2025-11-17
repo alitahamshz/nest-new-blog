@@ -10,6 +10,7 @@ import { Post, PostStatus } from '../entities/post.entity';
 import { Tag } from '../entities/tag.entity';
 import { Category } from '../entities/category.entity';
 import { User } from '../entities/user.entity';
+import { Product } from '../entities/product.entity';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { FilterPostsDto } from './dto/filter-post.dto';
@@ -32,6 +33,9 @@ export class PostsService {
 
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   /**
@@ -62,6 +66,19 @@ export class PostsService {
       });
     } else {
       post.tags = [];
+    }
+
+    // products (if provided)
+    if (
+      dto.productIds &&
+      Array.isArray(dto.productIds) &&
+      dto.productIds.length > 0
+    ) {
+      post.products = await this.productRepo.find({
+        where: { id: In(dto.productIds) },
+      });
+    } else {
+      post.products = [];
     }
 
     // category (if provided)
@@ -126,6 +143,18 @@ export class PostsService {
       }
     }
 
+    // products: if dto.productIds is provided (even empty array) -> update association
+    if (dto.productIds !== undefined) {
+      if (Array.isArray(dto.productIds) && dto.productIds.length > 0) {
+        post.products = await this.productRepo.find({
+          where: { id: In(dto.productIds) },
+        });
+      } else {
+        // empty array means remove all products
+        post.products = [];
+      }
+    }
+
     // category: allow setting to null (remove category)
     if (dto.category_id !== undefined) {
       if (dto.category_id === null) {
@@ -168,6 +197,7 @@ export class PostsService {
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.category', 'category')
       .leftJoinAndSelect('post.tags', 'tags')
+      .leftJoinAndSelect('post.products', 'products')
       .orderBy('post.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -198,7 +228,7 @@ export class PostsService {
   async findOne(id: number): Promise<Post> {
     const post = await this.postRepo.findOne({
       where: { id },
-      relations: ['author', 'tags', 'category'],
+      relations: ['author', 'tags', 'category', 'products'],
     });
     if (!post) throw new NotFoundException('Post not found');
     await this.postRepo.increment({ id }, 'view_count', 1);
@@ -359,5 +389,57 @@ export class PostsService {
       select: ['slug'], // فقط فیلد slug
       order: { createdAt: 'DESC' }, // اختیاری، اگه می‌خوای مرتب باشه
     });
+  }
+
+  /**
+   * Link products to a post (add to existing associations)
+   */
+  async linkProducts(postId: number, productIds: number[]): Promise<Post> {
+    if (!productIds || productIds.length === 0) {
+      return this.findOne(postId);
+    }
+
+    const post = await this.postRepo.findOne({
+      where: { id: postId },
+      relations: ['products'],
+    });
+    if (!post) throw new NotFoundException('Post not found');
+
+    const productsToAdd = await this.productRepo.find({
+      where: { id: In(productIds) },
+    });
+
+    if (productsToAdd.length === 0) {
+      throw new NotFoundException('No products found');
+    }
+
+    // Add new products to existing ones
+    const existingProductIds = new Set(post.products.map((p) => p.id));
+    const newProducts = productsToAdd.filter(
+      (p) => !existingProductIds.has(p.id),
+    );
+
+    post.products = [...post.products, ...newProducts];
+    return this.postRepo.save(post);
+  }
+
+  /**
+   * Unlink products from a post (remove from associations)
+   */
+  async unlinkProducts(postId: number, productIds: number[]): Promise<Post> {
+    if (!productIds || productIds.length === 0) {
+      return this.findOne(postId);
+    }
+
+    const post = await this.postRepo.findOne({
+      where: { id: postId },
+      relations: ['products'],
+    });
+    if (!post) throw new NotFoundException('Post not found');
+
+    const idsToRemove = new Set(productIds);
+    post.products = post.products.filter((p) => !idsToRemove.has(p.id));
+
+    return this.postRepo.save(post);
   }
 }

@@ -64,4 +64,26 @@ export class AdminPostsController {
   findOne(@Param('id') id: number) {
     return this.postsService.findOne(+id);
   }
+
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Post(':id/products')
+  @ApiBearerAuth('access-token')
+  linkProducts(
+    @Param('id') id: string,
+    @Body() body: { productIds: number[] },
+  ) {
+    return this.postsService.linkProducts(+id, body.productIds);
+  }
+
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Delete(':id/products')
+  @ApiBearerAuth('access-token')
+  unlinkProducts(
+    @Param('id') id: string,
+    @Body() body: { productIds: number[] },
+  ) {
+    return this.postsService.unlinkProducts(+id, body.productIds);
+  }
 }

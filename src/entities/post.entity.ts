@@ -3,6 +3,7 @@ import { Category } from 'src/entities/category.entity';
 import { Comment } from 'src/entities/comment.entity';
 import { Tag } from 'src/entities/tag.entity';
 import { User } from 'src/entities/user.entity';
+import { Product } from 'src/entities/product.entity';
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -77,6 +78,15 @@ export class Post {
 
   @OneToMany(() => Comment, (comment) => comment.post)
   comments: Comment[];
+
+  @ManyToMany(() => Product, { cascade: true })
+  @JoinTable({
+    name: 'post_products',
+    joinColumn: { name: 'post_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'product_id', referencedColumnName: 'id' },
+  })
+  products: Product[];
+
   // تصویر بندانگشتی
   @Column({ nullable: true })
   thumbnail: string;

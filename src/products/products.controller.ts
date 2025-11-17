@@ -46,16 +46,39 @@ export class ProductsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'دریافت لیست تمام محصولات با صفحه‌بندی' })
+  @ApiOperation({ summary: 'دریافت لیست تمام محصولات با صفحه‌بندی و جستجو' })
   @ApiQuery({
     name: 'page',
     required: false,
     description: 'شماره صفحه (پیش‌فرض: 1)',
+    example: 1,
   })
   @ApiQuery({
     name: 'limit',
     required: false,
     description: 'تعداد اقلام در هر صفحه (پیش‌فرض: 10)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    description: 'جستجو در نام محصول',
+  })
+  @ApiQuery({
+    name: 'sku',
+    required: false,
+    description: 'جستجو در کد محصول',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'فیلتر بر اساس شناسه دسته',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    description: 'فیلتر بر اساس وضعیت فعال (true/false)',
+    example: 'true',
   })
   @ApiResponse({
     status: 200,
@@ -64,8 +87,23 @@ export class ProductsController {
   async findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('name') name?: string,
+    @Query('sku') sku?: string,
+    @Query('categoryId', new ParseIntPipe({ optional: true }))
+    categoryId?: number,
+    @Query('isActive') isActive?: string,
   ) {
-    return await this.productsService.findAll(page || 1, limit || 10);
+    // ترکیب name و sku برای جستجو
+    const search = name || sku;
+    const isActiveBoolean =
+      isActive === 'true' ? true : isActive === 'false' ? false : undefined;
+    return await this.productsService.findAll(
+      page || 1,
+      limit || 10,
+      search,
+      categoryId,
+      isActiveBoolean,
+    );
   }
 
   @Get('category/:categoryId')
@@ -161,11 +199,11 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'حذف محصول' })
   @ApiParam({ name: 'id', description: 'شناسه محصول' })
   @ApiResponse({
-    status: 204,
+    status: 200,
     description: 'محصول با موفقیت حذف شد',
   })
   @ApiResponse({
@@ -173,6 +211,6 @@ export class ProductsController {
     description: 'محصول یافت نشد',
   })
   async remove(@Param('id') id: string) {
-    await this.productsService.remove(+id);
+    return await this.productsService.remove(+id);
   }
 }

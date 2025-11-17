@@ -140,8 +140,12 @@ export class ProductVariantValueService {
   /**
    * حذف مقدار
    */
-  async remove(id: number): Promise<void> {
+  async remove(id: number): Promise<{ message: string; success: boolean }> {
     const value = await this.findOne(id);
     await this.valueRepo.remove(value);
+    return {
+      message: `مقدار با شناسه ${id} با موفقیت حذف شد`,
+      success: true,
+    };
   }
 }
