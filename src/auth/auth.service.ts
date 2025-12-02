@@ -15,6 +15,7 @@ import { UserService } from '../users/users.service';
 import { Repository } from 'typeorm';
 import { User } from 'src/entities/user.entity';
 import { Role } from 'src/entities/role.entity';
+import { Seller } from 'src/entities/seller.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
@@ -26,6 +27,8 @@ export class AuthService {
     private userRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepository: Repository<Role>,
+    @InjectRepository(Seller)
+    private readonly sellerRepository: Repository<Seller>,
   ) {}
 
   async validateUser(email: string, pass: string) {
@@ -38,19 +41,46 @@ export class AuthService {
     return user;
   }
 
-  async login(user: any) {
+  async login(user: any, selectedRole?: string) {
+    // اگر نقش خاصی انتخاب شده
+    let roles = user.roles.map((r) => r.name);
+
+    if (selectedRole) {
+      // بررسی اینکه کاربر این نقش رو داره
+      if (!roles.includes(selectedRole)) {
+        throw new UnauthorizedException(
+          `کاربر نقش "${selectedRole}" ندارد. نقش‌های موجود: ${roles.join(', ')}`,
+        );
+      }
+      // فقط نقش انتخاب شده رو برگردان
+      roles = [selectedRole];
+    }
+
     const payload = {
       sub: user.id,
       email: user.email,
-      roles: user.roles.map((r) => r.name),
+      roles: roles,
     };
+
+    // اگر نقش seller است، seller ID رو هم بیار
+    let sellerId: number | null = null;
+    if (roles.includes('seller')) {
+      const seller = await this.sellerRepository.findOne({
+        where: { user: { id: user.id } },
+      });
+      if (seller) {
+        sellerId = seller.id;
+      }
+    }
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        roles: user.roles,
+        roles: roles,
+        sellerId: sellerId,
       },
     };
   }
