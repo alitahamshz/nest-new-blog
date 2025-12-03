@@ -41,6 +41,15 @@ export class SellerOffer {
   @Column({ nullable: true })
   discountPercent: number;
 
+  @Column({ type: 'integer', nullable: true })
+  minOrder: number; // حداقل تعداد سفارش
+
+  @Column({ type: 'integer', nullable: true })
+  maxOrder: number; // حداکثر تعداد سفارش
+
+  @Column('text', { nullable: true })
+  sellerNotes: string; // نقد و بررسی محصول توسط فروشنده
+
   @Column('boolean', { nullable: true })
   hasWarranty: boolean;
 

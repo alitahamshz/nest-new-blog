@@ -132,6 +132,9 @@ export class ProductsService {
     query.leftJoinAndSelect('product.gallery', 'gallery');
     query.leftJoinAndSelect('product.variants', 'variants');
     query.leftJoinAndSelect('variants.values', 'variantValues');
+    query.leftJoinAndSelect('product.offers', 'offers');
+    query.leftJoinAndSelect('offers.seller', 'seller');
+    query.leftJoinAndSelect('offers.variantValues', 'offerVariantValues');
 
     // جستجو در نام و کد محصول
     if (search) {
@@ -183,6 +186,8 @@ export class ProductsService {
         'variants.values',
         'variantValues',
         'offers',
+        'offers.seller',
+        'offers.variantValues',
       ],
     });
 

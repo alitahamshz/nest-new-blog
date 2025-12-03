@@ -75,6 +75,32 @@ export class CreateSellerOfferDto {
   stock: number;
 
   @ApiPropertyOptional({
+    description: 'حداقل تعداد سفارش',
+    example: 1,
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'حداقل سفارش باید عدد باشد' })
+  @Min(1, { message: 'حداقل سفارش باید حداقل 1 باشد' })
+  minOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'حداکثر تعداد سفارش',
+    example: 100,
+  })
+  @IsOptional()
+  @IsNumber({}, { message: 'حداکثر سفارش باید عدد باشد' })
+  @Min(1, { message: 'حداکثر سفارش باید حداقل 1 باشد' })
+  maxOrder?: number;
+
+  @ApiPropertyOptional({
+    description: 'نقد و بررسی محصول توسط فروشنده',
+    example: 'این محصول با کیفیت عالی است و...',
+  })
+  @IsOptional()
+  @IsString({ message: 'نقد و بررسی باید رشته باشد' })
+  sellerNotes?: string;
+
+  @ApiPropertyOptional({
     description: 'آیا گارانتی دارد؟',
     example: true,
   })

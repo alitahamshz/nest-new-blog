@@ -121,28 +121,35 @@ export class SellerOfferService {
         );
       }
     } else {
-      // برای محصولات با واریانت - بررسی ترکیب variant values
-      const existingOffer = await this.offerRepo
+      // برای محصولات با واریانت - بررسی اینکه این ترکیب دقیق variant values قبلاً وجود ندارد
+      const variantValueIdSet = new Set(createDto.variantValueIds || []);
+      const variantValueIdCount = variantValueIdSet.size;
+
+      // تمام افرهای این فروشنده برای این محصول رو بیار
+      const existingOffers = await this.offerRepo
         .createQueryBuilder('offer')
+        .leftJoinAndSelect('offer.variantValues', 'variantValues')
         .where('offer.sellerId = :sellerId', {
           sellerId: createDto.sellerId,
         })
         .andWhere('offer.productId = :productId', {
           productId: product.id,
         })
-        .leftJoinAndSelect(
-          'offer.variantValues',
-          'variantValues',
-          'variantValues.id IN (:...variantValueIds)',
-          {
-            variantValueIds: createDto.variantValueIds || [],
-          },
-        )
-        .getOne();
+        .getMany();
 
-      if (existingOffer) {
+      // چک کن آیا هریک از افرها دقیقاً همین variant values رو داره
+      const isDuplicate = existingOffers.some((offer) => {
+        const offerVariantIds = new Set(offer.variantValues.map((vv) => vv.id));
+        // اگر هر دو set یکسان باشند (تعداد و ID ها یکسان)
+        return (
+          offerVariantIds.size === variantValueIdCount &&
+          Array.from(variantValueIdSet).every((id) => offerVariantIds.has(id))
+        );
+      });
+
+      if (isDuplicate) {
         throw new ConflictException(
-          'این فروشنده قبلاً برای این ترکیب محصول/واریانت پیشنهاد ثبت کرده است',
+          'این فروشنده قبلاً برای این ترکیب دقیق از variant values پیشنهاد ثبت کرده است',
         );
       }
     }
@@ -163,6 +170,9 @@ export class SellerOfferService {
       discountPrice,
       discountPercent: createDto.discountPercent || 0,
       stock: createDto.stock,
+      minOrder: createDto.minOrder || 1,
+      maxOrder: createDto.maxOrder || 0,
+      sellerNotes: createDto.sellerNotes,
       hasWarranty: createDto.hasWarranty || false,
       warrantyDescription: createDto.warrantyDescription,
       isDefault: createDto.isDefault || false,
