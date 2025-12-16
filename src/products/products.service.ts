@@ -108,6 +108,34 @@ export class ProductsService {
   }
 
   /**
+   * دریافت تمام ID های دسته‌های فرزند به صورت recursive
+   */
+  private async getAllDescendantCategoryIds(
+    categoryId: number,
+  ): Promise<number[]> {
+    const category = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+      relations: ['children'],
+    });
+
+    if (!category) {
+      return [categoryId];
+    }
+
+    let allIds = [categoryId];
+
+    // برای هر فرزند، تمام نوادگان را به صورت recursive دریافت کن
+    if (category.children && category.children.length > 0) {
+      for (const child of category.children) {
+        const descendantIds = await this.getAllDescendantCategoryIds(child.id);
+        allIds = [...allIds, ...descendantIds];
+      }
+    }
+
+    return allIds;
+  }
+
+  /**
    * دریافت لیست محصولات با صفحه‌بندی و فیلتر
    */
   async findAll(
@@ -144,9 +172,12 @@ export class ProductsService {
       );
     }
 
-    // فیلتر بر اساس دسته
+    // فیلتر بر اساس دسته (شامل تمام دسته‌های فرزند)
     if (categoryId) {
-      query.andWhere('product.categoryId = :categoryId', { categoryId });
+      const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
+      query.andWhere('product.categoryId IN (:...categoryIds)', {
+        categoryIds,
+      });
     }
 
     // فیلتر بر اساس وضعیت
@@ -351,11 +382,15 @@ export class ProductsService {
   }
 
   /**
-   * دریافت محصولات یک دسته‌بندی
+   * دریافت محصولات یک دسته‌بندی (شامل تمام دسته‌های فرزند)
    */
   async findByCategory(categoryId: number): Promise<Product[]> {
+    const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
     return await this.productRepo.find({
-      where: { category: { id: categoryId }, isActive: true },
+      where: {
+        category: { id: In(categoryIds) },
+        isActive: true,
+      },
       relations: ['category', 'tags', 'gallery', 'variants', 'variants.values'],
       order: { createdAt: 'DESC' },
     });
