@@ -7,6 +7,8 @@ import {
   Param,
   ParseIntPipe,
   Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -14,16 +16,22 @@ import {
   ApiResponse,
   ApiParam,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { User } from '../entities/user.entity';
 
 @ApiTags('Orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'ایجاد سفارش جدید' })
   @ApiResponse({
@@ -34,7 +42,10 @@ export class OrdersController {
     status: 400,
     description: 'سبد خرید خالی است یا موجودی کافی نیست',
   })
-  async create(@Body() createDto: CreateOrderDto) {
+  async create(@Body() createDto: CreateOrderDto, @CurrentUser() user: User) {
+    if (user.id !== createDto.userId) {
+      throw new ForbiddenException('شما نمی‌تواند سفارش دیگران را ایجاد کنید');
+    }
     return await this.ordersService.createOrder(createDto);
   }
 
@@ -48,15 +59,37 @@ export class OrdersController {
     return await this.ordersService.findAll();
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('user/:userId')
   @ApiOperation({ summary: 'دریافت سفارشات یک کاربر' })
   @ApiParam({ name: 'userId', description: 'شناسه کاربر' })
+  @ApiQuery({
+    name: 'page',
+    description: 'شماره صفحه',
+    required: false,
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'تعداد آیتم‌ها در صفحه',
+    required: false,
+    example: 10,
+  })
   @ApiResponse({
     status: 200,
     description: 'لیست سفارشات کاربر',
   })
-  async findByUser(@Param('userId', ParseIntPipe) userId: number) {
-    return await this.ordersService.findByUser(userId);
+  async findByUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @CurrentUser() user?: User,
+  ) {
+    if (user?.id !== userId) {
+      throw new ForbiddenException('شما دسترسی به سفارشات دیگران را ندارید');
+    }
+    return await this.ordersService.findByUser(userId, page || 1, limit || 10);
   }
 
   @Get('seller/:sellerId')
@@ -85,6 +118,8 @@ export class OrdersController {
     return await this.ordersService.findByOrderNumber(orderNumber);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(':id')
   @ApiOperation({ summary: 'دریافت یک سفارش' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
@@ -96,10 +131,19 @@ export class OrdersController {
     status: 404,
     description: 'سفارش یافت نشد',
   })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return await this.ordersService.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    const order = await this.ordersService.findOne(id);
+    if (order.user.id !== user.id) {
+      throw new ForbiddenException('شما دسترسی به این سفارش را ندارید');
+    }
+    return order;
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Patch(':id')
   @ApiOperation({ summary: 'بروزرسانی سفارش' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
@@ -110,10 +154,13 @@ export class OrdersController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateOrderDto,
+    @CurrentUser() user: User,
   ) {
-    return await this.ordersService.update(id, updateDto);
+    return await this.ordersService.update(id, updateDto, user);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'لغو سفارش' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
@@ -129,10 +176,13 @@ export class OrdersController {
   async cancelOrder(
     @Param('id', ParseIntPipe) id: number,
     @Query('reason') reason: string,
+    @CurrentUser() user: User,
   ) {
-    return await this.ordersService.cancelOrder(id, reason);
+    return await this.ordersService.cancelOrder(id, reason, user);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Patch(':id/confirm-payment')
   @ApiOperation({ summary: 'تایید پرداخت سفارش' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
@@ -148,7 +198,8 @@ export class OrdersController {
   async confirmPayment(
     @Param('id', ParseIntPipe) id: number,
     @Query('transactionId') transactionId: string,
+    @CurrentUser() user: User,
   ) {
-    return await this.ordersService.confirmPayment(id, transactionId);
+    return await this.ordersService.confirmPayment(id, transactionId, user);
   }
 }

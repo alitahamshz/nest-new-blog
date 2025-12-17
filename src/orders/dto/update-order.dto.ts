@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsString } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsNotEmpty } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus, PaymentStatus } from '../../entities/order.enums';
 
@@ -20,13 +20,6 @@ export class UpdateOrderDto {
   paymentStatus?: PaymentStatus;
 
   @ApiPropertyOptional({
-    description: 'شماره تراکنش',
-  })
-  @IsOptional()
-  @IsString()
-  transactionId?: string;
-
-  @ApiPropertyOptional({
     description: 'کد رهگیری',
   })
   @IsOptional()
@@ -39,11 +32,4 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsString()
   adminNote?: string;
-
-  @ApiPropertyOptional({
-    description: 'دلیل لغو',
-  })
-  @IsOptional()
-  @IsString()
-  cancelReason?: string;
 }

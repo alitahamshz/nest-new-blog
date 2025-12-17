@@ -2,11 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, Between, DataSource } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
+import { CartItem } from '../entities/cart-item.entity';
 import { User } from '../entities/user.entity';
 import { SellerOffer } from '../entities/seller-offer.entity';
 import { Cart } from '../entities/cart.entity';
@@ -52,7 +54,12 @@ export class OrdersService {
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
         where: { user: { id: createDto.userId } },
-        relations: ['items', 'items.offer', 'items.product', 'items.variantValues'],
+        relations: [
+          'items',
+          'items.offer',
+          'items.product',
+          'items.variantValues',
+        ],
       });
 
       if (!cart || cart.items.length === 0) {
@@ -145,8 +152,8 @@ export class OrdersService {
 
       const savedOrder = await queryRunner.manager.save(order);
 
-      // remove cart inside transaction
-      await queryRunner.manager.remove(cart);
+      // remove cart items inside transaction (not the entire cart)
+      await queryRunner.manager.remove(CartItem, cart.items);
 
       await queryRunner.commitTransaction();
       return savedOrder;
@@ -288,14 +295,27 @@ export class OrdersService {
   }
 
   /**
-   * دریافت سفارشات یک کاربر
+   * دریافت سفارشات یک کاربر (با pagination)
    */
-  async findByUser(userId: number): Promise<Order[]> {
-    return await this.orderRepo.find({
+  async findByUser(
+    userId: number,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ data: Order[]; total: number; page: number; pages: number }> {
+    const [orders, total] = await this.orderRepo.findAndCount({
       where: { user: { id: userId } },
-      relations: ['items', 'items.product', 'items.variant', 'items.seller'],
+      relations: ['items', 'items.product', 'items.seller'],
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return {
+      data: orders,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    };
   }
 
   /**
@@ -356,8 +376,17 @@ export class OrdersService {
   /**
    * بروزرسانی سفارش
    */
-  async update(id: number, updateDto: UpdateOrderDto): Promise<Order> {
+  async update(
+    id: number,
+    updateDto: UpdateOrderDto,
+    user: User,
+  ): Promise<Order> {
     const order = await this.findOne(id);
+
+    // بررسی ownership
+    if (order.user.id !== user.id) {
+      throw new ForbiddenException('شما این سفارش را مالکیت ندارید');
+    }
 
     // بروزرسانی تاریخ‌های مربوطه
     if (updateDto.paymentStatus === PaymentStatus.COMPLETED && !order.paidAt) {
@@ -379,8 +408,17 @@ export class OrdersService {
   /**
    * لغو سفارش
    */
-  async cancelOrder(id: number, cancelReason: string): Promise<Order> {
+  async cancelOrder(
+    id: number,
+    cancelReason: string,
+    user: User,
+  ): Promise<Order> {
     const order = await this.findOne(id);
+
+    // بررسی ownership
+    if (order.user.id !== user.id) {
+      throw new ForbiddenException('شما این سفارش را مالکیت ندارید');
+    }
 
     if (order.status === OrderStatus.DELIVERED) {
       throw new BadRequestException('سفارش تحویل داده شده قابل لغو نیست');
@@ -411,8 +449,17 @@ export class OrdersService {
   /**
    * تایید پرداخت
    */
-  async confirmPayment(id: number, transactionId: string): Promise<Order> {
+  async confirmPayment(
+    id: number,
+    transactionId: string,
+    user: User,
+  ): Promise<Order> {
     const order = await this.findOne(id);
+
+    // بررسی ownership
+    if (order.user.id !== user.id) {
+      throw new ForbiddenException('شما این سفارش را مالکیت ندارید');
+    }
 
     order.paymentStatus = PaymentStatus.COMPLETED;
     order.transactionId = transactionId;

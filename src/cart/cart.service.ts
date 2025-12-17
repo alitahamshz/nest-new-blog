@@ -129,7 +129,7 @@ export class CartService {
       throw new NotFoundException('آیتم در سبد خرید یافت نشد');
     }
 
-    // بررسی موجودی
+    // بررسی موجودی و دریافت قیمت فعلی
     const offer = await this.offerRepo.findOne({
       where: { id: item.offer.id },
     });
@@ -145,6 +145,7 @@ export class CartService {
     }
 
     item.quantity = dto.quantity;
+    item.price = offer.discountPrice; // به‌روزرسانی قیمت به مقدار فعلی
     await this.cartItemRepo.save(item);
 
     return await this.getOrCreateCart(userId);
