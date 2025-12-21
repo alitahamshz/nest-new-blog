@@ -232,27 +232,44 @@ export class ProductsService {
   /**
    * پیدا کردن محصول با slug
    */
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
   async findBySlug(slug: string): Promise<Product> {
-    const product = await this.productRepo.findOne({
-      where: { slug },
-      relations: [
-        'category',
-        'tags',
-        'specifications',
-        'gallery',
-        'variants',
-        'variants.values',
-        'variantValues',
-        'offers',
-      ],
-    });
+    const product = await this.productRepo
+      .createQueryBuilder('product')
+      .where('product.slug = :slug', { slug })
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.specifications', 'specifications')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.values', 'variantValues')
+      .leftJoinAndSelect('product.variantValues', 'productVariantValues')
+      .leftJoinAndSelect('product.offers', 'offers')
+      .leftJoinAndSelect('offers.seller', 'seller', 'TRUE')
+      .leftJoinAndSelect('offers.variantValues', 'offerVariantValues')
+      .addSelect('seller.businessName')
+      .getOne();
 
     if (!product) {
       throw new NotFoundException(`محصول با slug "${slug}" یافت نشد`);
     }
 
+    // حذف فیلدهای غیر ضروری از seller
+    if (product.offers && product.offers.length > 0) {
+      const productAny = product as any;
+      productAny.offers = product.offers.map((offer) => {
+        const { businessName } = offer.seller;
+        return {
+          ...offer,
+          seller: { businessName } as any,
+          variantValues: offer.variantValues || [],
+        };
+      });
+    }
+
     return product;
   }
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 
   /**
    * بروزرسانی محصول

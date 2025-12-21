@@ -10,6 +10,8 @@ import {
   HttpCode,
   HttpStatus,
   ParseIntPipe,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,6 +23,11 @@ import {
 import { SellerOfferService } from './seller-offer.service';
 import { CreateSellerOfferDto } from './dto/create-seller-offer.dto';
 import { UpdateSellerOfferDto } from './dto/update-seller-offer.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/guards/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { User } from '../entities/user.entity';
 
 @ApiTags('Seller Offers')
 @Controller('seller-offers')
@@ -46,24 +53,70 @@ export class SellerOfferController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'دریافت تمام پیشنهادات' })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'seller')
+  @ApiOperation({ summary: 'دریافت تمام پیشنهادات یا پیشنهادات کاربر فعلی' })
   @ApiResponse({
     status: 200,
-    description: 'لیست تمام پیشنهادات',
+    description: 'admin: لیست تمام پیشنهادات، seller: فقط پیشنهادات خود',
   })
-  async findAll() {
-    return await this.sellerOfferService.findAll();
+  async findAll(@CurrentUser() user: User) {
+    // بررسی اینکه user موجود است
+    if (!user || !user.roles) {
+      throw new ForbiddenException('احراز هویت ناموفق');
+    }
+
+    // اگر کاربر admin است، تمام پیشنهادات را برگردان
+    const isAdmin = user.roles.some((role) => role.name === 'admin');
+    if (isAdmin) {
+      return await this.sellerOfferService.findAll();
+    }
+
+    // اگر seller است، فقط پیشنهادات خود را برگردان
+    if (user.seller) {
+      return await this.sellerOfferService.findBySeller(user.seller.id);
+    }
+
+    // اگر نه admin هست و نه seller، خطا برگردان
+    throw new ForbiddenException('شما نقش seller یا admin ندارید');
   }
 
   @Get('seller/:sellerId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'seller')
   @ApiOperation({ summary: 'دریافت پیشنهادات یک فروشنده' })
   @ApiParam({ name: 'sellerId', description: 'شناسه فروشنده' })
   @ApiResponse({
     status: 200,
     description: 'لیست پیشنهادات فروشنده',
   })
-  async findBySeller(@Param('sellerId', ParseIntPipe) sellerId: number) {
-    return await this.sellerOfferService.findBySeller(sellerId);
+  @ApiResponse({
+    status: 403,
+    description: 'شما اجازه دسترسی به این پیشنهادات را ندارید',
+  })
+  async findBySeller(
+    @Param('sellerId', ParseIntPipe) sellerId: number,
+    @CurrentUser() user: User,
+  ) {
+    // بررسی اینکه user موجود است
+    if (!user || !user.roles) {
+      throw new ForbiddenException('احراز هویت ناموفق');
+    }
+
+    // اگر کاربر admin است، تمام پیشنهادات فروشنده را برگردان
+    const isAdmin = user.roles.some((role) => role.name === 'admin');
+    if (isAdmin) {
+      return await this.sellerOfferService.findBySeller(sellerId);
+    }
+
+    // اگر seller است، فقط می‌تواند پیشنهادات خود را ببیند
+    if (user.seller && user.seller.id === sellerId) {
+      return await this.sellerOfferService.findBySeller(sellerId);
+    }
+
+    throw new ForbiddenException(
+      'شما اجازه دسترسی به پیشنهادات این فروشنده را ندارید',
+    );
   }
 
   @Get('product/:productId')
@@ -84,7 +137,9 @@ export class SellerOfferController {
     status: 200,
     description: 'لیست پیشنهادات (مرتب شده بر اساس قیمت)',
   })
-  async findByVariantValue(@Param('variantId', ParseIntPipe) variantValueId: number) {
+  async findByVariantValue(
+    @Param('variantId', ParseIntPipe) variantValueId: number,
+  ) {
     return await this.sellerOfferService.findByVariantValue(variantValueId);
   }
 

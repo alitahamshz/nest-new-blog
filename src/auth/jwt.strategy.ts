@@ -7,9 +7,17 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../entities/user.entity';
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {
     const jwtSecret = configService.getOrThrow<string>('MY_SUPER_SECRET');
     console.log({configService})
     if (!jwtSecret) {
@@ -22,10 +30,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: any) {
+  async validate(payload: any) {
     console.log({payload})
-    // چیزی که داخل token هست رو برمی‌گردونی
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-    return { userId: payload.sub, email: payload.email, role: payload.roles };
+    // user رو از database لود کن تا roles داشته باشد
+    const user = await this.userRepository.findOne({
+      where: { id: payload.sub },
+      relations: ['roles', 'seller'],
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return user;
   }
 }

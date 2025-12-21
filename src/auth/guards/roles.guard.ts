@@ -20,11 +20,23 @@ export class RolesGuard implements CanActivate {
     }
 
     const { user } = context.switchToHttp().getRequest();
-    console.log({ user });
-    if (!user || !user.role) {
+    console.log({ user, requiredRoles });
+
+    if (!user) {
       return false;
     }
 
-    return requiredRoles.some((role) => user.role.includes(role));
+    // user.roles یک array از Role objects است
+    if (!user.roles || !Array.isArray(user.roles)) {
+      console.error('User roles not found or not an array');
+      return false;
+    }
+
+    // نام نقش‌های کاربر را استخراج کن
+    const userRoleNames = user.roles.map((role: { name: string }) => role.name);
+    console.log({ userRoleNames });
+
+    // بررسی اینکه کاربر یکی از نقش‌های مورد نیاز را داشته باشد
+    return requiredRoles.some((role) => userRoleNames.includes(role));
   }
 }
