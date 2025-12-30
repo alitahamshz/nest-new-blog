@@ -11,6 +11,7 @@ import { User } from '../entities/user.entity';
 import { SellerOffer } from '../entities/seller-offer.entity';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { SyncCartDto } from './dto/sync-cart.dto';
 
 @Injectable()
 export class CartService {
@@ -62,7 +63,7 @@ export class CartService {
     // بررسی وجود پیشنهاد
     const offer = await this.offerRepo.findOne({
       where: { id: dto.offerId },
-      relations: ['product', 'variant', 'seller'],
+      relations: ['product', 'seller'],
     });
 
     if (!offer) {
@@ -96,16 +97,33 @@ export class CartService {
       }
 
       existingItem.quantity = newQuantity;
+      existingItem.price = offer.discountPrice || offer.price;
+      existingItem.discountPrice = offer.discountPrice;
+      existingItem.discountPercent = offer.discountPercent || 0;
+      existingItem.stock = offer.stock;
       await this.cartItemRepo.save(existingItem);
     } else {
       // اگر وجود نداشت، آیتم جدید بساز
       const cartItem = this.cartItemRepo.create({
         cart,
         product: offer.product,
-        variantValues: offer.variantValues,
         offer,
         quantity: dto.quantity,
-        price: offer.discountPrice,
+        price: offer.discountPrice || offer.price,
+        // فیلدهای snapshot
+        productName: offer.product.name,
+        productSlug: offer.product.slug,
+        productImage: offer?.product?.mainImage || '',
+        sellerName: offer.seller.businessName,
+        discountPrice: offer.discountPrice,
+        discountPercent: offer.discountPercent || 0,
+        minOrder: offer.minOrder || 1,
+        maxOrder: offer.maxOrder || 999,
+        stock: offer.stock,
+        hasWarranty: offer.hasWarranty || false,
+        warrantyDescription: offer.warrantyDescription,
+        selectedVariants: {}, // برای بعداً
+        variantNames: {}, // برای بعداً
       });
 
       await this.cartItemRepo.save(cartItem);
@@ -202,5 +220,130 @@ export class CartService {
     const itemsCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
     return { subtotal, itemsCount };
+  }
+
+  /**
+   * سینک کردن سبد خرید آفلاین با سبد خرید آنلاین
+   * اگر کاربر آفلاین بود و سبد خرید ایجاد کرد، هنگام آنلاین شدن سبد‌ها ادغام می‌شوند
+   */
+  async syncCart(userId: number, syncDto: SyncCartDto): Promise<Cart> {
+    const cart = await this.getOrCreateCart(userId);
+
+    // برای هر آیتم در سبد آفلاین
+    for (const offlineItem of syncDto.items) {
+      // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
+      const existingItem = cart.items.find(
+        (item) => item.offer.id === offlineItem.offerId,
+      );
+
+      // بررسی وجود پیشنهاد برای دریافت آخرین اطلاعات
+      const offer = await this.offerRepo.findOne({
+        where: { id: offlineItem.offerId },
+        relations: ['product', 'seller'],
+      });
+
+      if (!offer) {
+        // اگر پیشنهاد حذف شده، در این مورد می‌تواند آیتم را نادیده بگیریم یا تجاهل کنیم
+        continue;
+      }
+
+      if (!offer.isActive) {
+        // اگر پیشنهاد غیرفعال است، نادیده بگیریم
+        continue;
+      }
+
+      // بررسی موجودی کافی برای تعداد درخواست شده
+      const totalQuantityNeeded = existingItem
+        ? existingItem.quantity + offlineItem.quantity
+        : offlineItem.quantity;
+
+      if (offer.stock < totalQuantityNeeded) {
+        // اگر موجودی کافی نیست، از موجودی موجود استفاده کنیم
+        const availableQuantity = offer.stock;
+        if (availableQuantity === 0) {
+          continue; // اگر موجودی صفر است، نادیده بگیریم
+        }
+
+        if (existingItem) {
+          existingItem.quantity = availableQuantity;
+        } else {
+          // آیتم جدید ایجاد کنیم
+          const cartItem = this.cartItemRepo.create({
+            cart,
+            product: offer.product,
+            offer,
+            quantity: availableQuantity,
+            price: offer.discountPrice || offer.price,
+            // اطلاعات snapshot از آفلاین
+            productName: offlineItem.productName,
+            productSlug: offlineItem.productSlug,
+            productImage: offlineItem.productImage,
+            sellerName: offlineItem.sellerName,
+            discountPrice: offlineItem.discountPrice || offer.discountPrice,
+            discountPercent: offlineItem.discountPercent || 0,
+            minOrder: offlineItem.minOrder,
+            maxOrder: offlineItem.maxOrder,
+            stock: offer.stock, // آخرین موجودی
+            hasWarranty: offlineItem.hasWarranty,
+            warrantyDescription: offlineItem.warrantyDescription,
+            selectedVariants: offlineItem.selectedVariants,
+            variantNames: offlineItem.variantNames,
+          });
+
+          await this.cartItemRepo.save(cartItem);
+          continue;
+        }
+      }
+
+      if (existingItem) {
+        // اگر آیتم وجود داشت، تعداد را ادغام کنیم
+        existingItem.quantity = totalQuantityNeeded;
+        // اطلاعات را به‌روزرسانی کنیم از آخرین اطلاعات
+        existingItem.price = offer.discountPrice || offer.price;
+        existingItem.productName = offlineItem.productName;
+        existingItem.productSlug = offlineItem.productSlug;
+        existingItem.productImage =
+          offlineItem.productImage || existingItem.productImage;
+        existingItem.sellerName = offlineItem.sellerName;
+        existingItem.discountPrice =
+          offlineItem.discountPrice || offer.discountPrice;
+        existingItem.discountPercent = offlineItem.discountPercent || 0;
+        existingItem.stock = offer.stock;
+        existingItem.hasWarranty = offlineItem.hasWarranty;
+        existingItem.warrantyDescription =
+          offlineItem.warrantyDescription || existingItem.warrantyDescription;
+        existingItem.selectedVariants = offlineItem.selectedVariants || {};
+        existingItem.variantNames = offlineItem.variantNames || {};
+
+        await this.cartItemRepo.save(existingItem);
+      } else {
+        // اگر آیتم وجود نداشت، جدید بساز
+        const cartItem = this.cartItemRepo.create({
+          cart,
+          product: offer.product,
+          offer,
+          quantity: offlineItem.quantity,
+          price: offer.discountPrice || offer.price,
+          // اطلاعات snapshot
+          productName: offlineItem.productName,
+          productSlug: offlineItem.productSlug,
+          productImage: offlineItem.productImage,
+          sellerName: offlineItem.sellerName,
+          discountPrice: offlineItem.discountPrice || offer.discountPrice,
+          discountPercent: offlineItem.discountPercent || 0,
+          minOrder: offlineItem.minOrder,
+          maxOrder: offlineItem.maxOrder,
+          stock: offer.stock,
+          hasWarranty: offlineItem.hasWarranty,
+          warrantyDescription: offlineItem.warrantyDescription,
+          selectedVariants: offlineItem.selectedVariants,
+          variantNames: offlineItem.variantNames,
+        });
+
+        await this.cartItemRepo.save(cartItem);
+      }
+    }
+
+    return await this.getOrCreateCart(userId);
   }
 }

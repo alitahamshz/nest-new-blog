@@ -43,10 +43,37 @@ export class OrderItem {
   productName: string;
 
   @Column({ nullable: true })
+  productSlug: string; // slug محصول
+
+  @Column({ nullable: true })
+  productImage: string; // تصویر محصول
+
+  @Column({ nullable: true })
   variantValueNames: string; // مثل: "رنگ: مشکی - اندازه: L"
 
   @Column()
   sellerBusinessName: string;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  discountPrice: number; // قیمت تخفیف‌دار در زمان خرید
+
+  @Column({ type: 'int', default: 0 })
+  discountPercent: number; // درصد تخفیف
+
+  @Column({ type: 'int' })
+  minOrder: number; // حداقل سفارش
+
+  @Column({ type: 'int' })
+  maxOrder: number; // حداکثر سفارش
+
+  @Column({ type: 'int' })
+  stock: number; // موجودی در زمان خرید
+
+  @Column({ type: 'boolean', default: false })
+  hasWarranty: boolean; // آیا گارانتی داشت
+
+  @Column({ type: 'text', nullable: true })
+  warrantyDescription: string; // توضیح گارانتی
 
   @Column({ type: 'int' })
   quantity: number;

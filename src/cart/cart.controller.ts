@@ -22,6 +22,7 @@ import {
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { SyncCartDto } from './dto/sync-cart.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
@@ -95,6 +96,30 @@ export class CartController {
       throw new ForbiddenException('شما دسترسی به این سبد خرید را ندارید');
     }
     return await this.cartService.addToCart(userId, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post(':userId/sync')
+  @ApiOperation({ summary: 'سینک کردن سبد خرید آفلاین با سبد خرید آنلاین' })
+  @ApiParam({ name: 'userId', description: 'شناسه کاربر' })
+  @ApiResponse({
+    status: 201,
+    description: 'سبد خرید سینک شد',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'خطا در سینک کردن',
+  })
+  async syncCart(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Body() dto: SyncCartDto,
+    @CurrentUser() user: User,
+  ) {
+    if (user.id !== userId) {
+      throw new ForbiddenException('شما دسترسی به این سبد خرید را ندارید');
+    }
+    return await this.cartService.syncCart(userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

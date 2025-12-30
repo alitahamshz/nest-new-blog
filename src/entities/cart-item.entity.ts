@@ -41,6 +41,46 @@ export class CartItem {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   price: number; // قیمت در زمان افزودن به سبد
 
+  // فیلدهای اضافی برای کاهش joins
+  @Column()
+  productName: string; // نام محصول
+
+  @Column()
+  productSlug: string; // slug محصول
+
+  @Column({ nullable: true })
+  productImage: string; // تصویر محصول
+
+  @Column()
+  sellerName: string; // نام فروشنده
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  discountPrice: number; // قیمت تخفیف‌دار
+
+  @Column({ type: 'int', default: 0 })
+  discountPercent: number; // درصد تخفیف
+
+  @Column({ type: 'int' })
+  minOrder: number; // حداقل سفارش
+
+  @Column({ type: 'int' })
+  maxOrder: number; // حداکثر سفارش
+
+  @Column({ type: 'int' })
+  stock: number; // موجودی
+
+  @Column({ type: 'boolean', default: false })
+  hasWarranty: boolean; // آیا گارانتی دارد
+
+  @Column({ type: 'text', nullable: true })
+  warrantyDescription: string; // توضیح گارانتی
+
+  @Column({ type: 'jsonb', nullable: true })
+  selectedVariants: Record<string, any>; // {variantId: variantValueId}
+
+  @Column({ type: 'jsonb', nullable: true })
+  variantNames: Record<string, any>; // نام‌های انتخاب شده
+
   @CreateDateColumn()
   createdAt: Date;
 
