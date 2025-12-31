@@ -3,13 +3,10 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  ManyToMany,
-  JoinTable,
   CreateDateColumn,
 } from 'typeorm';
 import { Order } from './order.entity';
 import { Product } from './product.entity';
-import { ProductVariantValue } from './product-variant-value.entity';
 import { Seller } from './seller.entity';
 import { SellerOffer } from './seller-offer.entity';
 
@@ -23,14 +20,6 @@ export class OrderItem {
 
   @ManyToOne(() => Product, { nullable: false })
   product: Product;
-
-  @ManyToMany(() => ProductVariantValue, { nullable: true })
-  @JoinTable({
-    name: 'order_item_variant_values',
-    joinColumn: { name: 'orderItemId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'variantValueId', referencedColumnName: 'id' },
-  })
-  variantValues: ProductVariantValue[] | null;
 
   @ManyToOne(() => Seller, { nullable: false })
   seller: Seller;
@@ -74,6 +63,19 @@ export class OrderItem {
 
   @Column({ type: 'text', nullable: true })
   warrantyDescription: string; // توضیح گارانتی
+
+  // variant snapshot fields
+  @Column({ type: 'int', nullable: true })
+  selectedVariantId: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  selectedVariantValueId: number | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  selectedVariantObject: Record<string, any> | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  selectedVariantValueObject: Record<string, any> | null;
 
   @Column({ type: 'int' })
   quantity: number;

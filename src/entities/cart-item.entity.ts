@@ -3,14 +3,11 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
-  ManyToMany,
-  JoinTable,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Cart } from './cart.entity';
 import { Product } from './product.entity';
-import { ProductVariantValue } from './product-variant-value.entity';
 import { SellerOffer } from './seller-offer.entity';
 
 @Entity('cart_items')
@@ -23,14 +20,6 @@ export class CartItem {
 
   @ManyToOne(() => Product, { nullable: false })
   product: Product;
-
-  @ManyToMany(() => ProductVariantValue, { nullable: true })
-  @JoinTable({
-    name: 'cart_item_variant_values',
-    joinColumn: { name: 'cartItemId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'variantValueId', referencedColumnName: 'id' },
-  })
-  variantValues: ProductVariantValue[] | null;
 
   @ManyToOne(() => SellerOffer, { nullable: false })
   offer: SellerOffer;
@@ -60,11 +49,11 @@ export class CartItem {
   @Column({ type: 'int', default: 0 })
   discountPercent: number; // درصد تخفیف
 
-  @Column({ type: 'int' })
-  minOrder: number; // حداقل سفارش
+  @Column({ type: 'int', nullable: true })
+  minOrder: number | null; // حداقل سفارش
 
-  @Column({ type: 'int' })
-  maxOrder: number; // حداکثر سفارش
+  @Column({ type: 'int', nullable: true })
+  maxOrder: number | null; // حداکثر سفارش
 
   @Column({ type: 'int' })
   stock: number; // موجودی
@@ -75,11 +64,17 @@ export class CartItem {
   @Column({ type: 'text', nullable: true })
   warrantyDescription: string; // توضیح گارانتی
 
-  @Column({ type: 'jsonb', nullable: true })
-  selectedVariants: Record<string, any>; // {variantId: variantValueId}
+  @Column({ type: 'int', nullable: true })
+  selectedVariantId: number | null; // شناسه واریانت انتخاب شده
+
+  @Column({ type: 'int', nullable: true })
+  selectedVariantValueId: number | null; // شناسه مقدار واریانت انتخاب شده
 
   @Column({ type: 'jsonb', nullable: true })
-  variantNames: Record<string, any>; // نام‌های انتخاب شده
+  selectedVariantObject: Record<string, any> | null; // object کامل واریانت
+
+  @Column({ type: 'jsonb', nullable: true })
+  selectedVariantValueObject: Record<string, any> | null; // object کامل مقدار واریانت
 
   @CreateDateColumn()
   createdAt: Date;

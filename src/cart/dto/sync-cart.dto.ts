@@ -11,8 +11,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SyncCartItemDto {
   @ApiProperty({
-    description: 'شناسه یکتای آیتم سبد (مثل: offer_59_variant_1641)',
-    example: 'offer_59_variant_1641',
+    description: 'شناسه یکتای آیتم سبد (مثل: offer_54_variant_36)',
+    example: 'offer_54_variant_36',
   })
   @IsNotEmpty({ message: 'cartItemId الزامی است' })
   @IsString({ message: 'cartItemId باید رشته‌ای باشد' })
@@ -20,7 +20,7 @@ export class SyncCartItemDto {
 
   @ApiProperty({
     description: 'شناسه محصول',
-    example: 20,
+    example: 17,
   })
   @IsNotEmpty({ message: 'productId الزامی است' })
   @IsNumber({}, { message: 'productId باید عدد باشد' })
@@ -36,7 +36,6 @@ export class SyncCartItemDto {
 
   @ApiProperty({
     description: 'slug محصول',
-    example: 'گوشی-موبایل-اپل-iphone-16',
   })
   @IsNotEmpty({ message: 'productSlug الزامی است' })
   @IsString({ message: 'productSlug باید رشته‌ای باشد' })
@@ -44,7 +43,6 @@ export class SyncCartItemDto {
 
   @ApiPropertyOptional({
     description: 'لینک تصویر محصول',
-    example: 'http://localhost:5000/uploads/2025/12/image.jpg',
   })
   @IsOptional()
   @IsString({ message: 'productImage باید رشته‌ای باشد' })
@@ -52,7 +50,7 @@ export class SyncCartItemDto {
 
   @ApiProperty({
     description: 'شناسه پیشنهاد فروشنده',
-    example: 59,
+    example: 54,
   })
   @IsNotEmpty({ message: 'offerId الزامی است' })
   @IsNumber({}, { message: 'offerId باید عدد باشد' })
@@ -60,7 +58,6 @@ export class SyncCartItemDto {
 
   @ApiProperty({
     description: 'نام فروشنده',
-    example: 'ادمین فروشنده',
   })
   @IsNotEmpty({ message: 'sellerName الزامی است' })
   @IsString({ message: 'sellerName باید رشته‌ای باشد' })
@@ -68,7 +65,7 @@ export class SyncCartItemDto {
 
   @ApiProperty({
     description: 'قیمت اصلی',
-    example: 26000000,
+    example: 18000000,
   })
   @IsNotEmpty({ message: 'price الزامی است' })
   @IsNumber({}, { message: 'price باید عدد باشد' })
@@ -76,7 +73,6 @@ export class SyncCartItemDto {
 
   @ApiPropertyOptional({
     description: 'قیمت تخفیف‌دار',
-    example: 26000000,
   })
   @IsOptional()
   @IsNumber({}, { message: 'discountPrice باید عدد باشد' })
@@ -91,18 +87,32 @@ export class SyncCartItemDto {
   discountPercent?: number;
 
   @ApiPropertyOptional({
-    description: 'واریانت‌های انتخاب شده (مثل: {16: 41})',
-    example: { 16: 41 },
+    description: 'شناسه واریانت انتخاب شده',
+    example: 15,
   })
   @IsOptional()
-  selectedVariants?: Record<string, any>;
+  @IsNumber({}, { message: 'selectedVariantId باید عدد باشد' })
+  selectedVariantId?: number;
 
   @ApiPropertyOptional({
-    description: 'نام‌های واریانت‌های انتخاب شده',
-    example: { 16: { variantName: 'مقدار حافظه', valueName: '512 گیگابایت' } },
+    description: 'شناسه مقدار واریانت انتخاب شده',
+    example: 36,
   })
   @IsOptional()
-  variantNames?: Record<string, any>;
+  @IsNumber({}, { message: 'selectedVariantValueId باید عدد باشد' })
+  selectedVariantValueId?: number;
+
+  @ApiPropertyOptional({
+    description: 'object کامل واریانت انتخاب شده',
+  })
+  @IsOptional()
+  selectedVariantObject?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: 'object کامل مقدار واریانت انتخاب شده',
+  })
+  @IsOptional()
+  selectedVariantValueObject?: Record<string, any>;
 
   @ApiProperty({
     description: 'تعداد',
@@ -112,25 +122,23 @@ export class SyncCartItemDto {
   @IsNumber({}, { message: 'quantity باید عدد باشد' })
   quantity: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'حداقل سفارش',
-    example: 1,
   })
-  @IsNotEmpty({ message: 'minOrder الزامی است' })
+  @IsOptional()
   @IsNumber({}, { message: 'minOrder باید عدد باشد' })
-  minOrder: number;
+  minOrder?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'حداکثر سفارش',
-    example: 2,
   })
-  @IsNotEmpty({ message: 'maxOrder الزامی است' })
+  @IsOptional()
   @IsNumber({}, { message: 'maxOrder باید عدد باشد' })
-  maxOrder: number;
+  maxOrder?: number;
 
   @ApiProperty({
     description: 'موجودی',
-    example: 20,
+    example: 25,
   })
   @IsNotEmpty({ message: 'stock الزامی است' })
   @IsNumber({}, { message: 'stock باید عدد باشد' })
@@ -145,7 +153,6 @@ export class SyncCartItemDto {
 
   @ApiPropertyOptional({
     description: 'توضیح گارانتی',
-    example: 'گارانتی 24 ماهه',
   })
   @IsOptional()
   @IsString({ message: 'warrantyDescription باید رشته‌ای باشد' })

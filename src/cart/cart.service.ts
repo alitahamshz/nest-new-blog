@@ -82,8 +82,12 @@ export class CartService {
     }
 
     // بررسی اینکه آیا این آیتم قبلاً در سبد وجود دارد
+    // اگر محصول تنوع دارد، به selectedVariantValueId نگاه کنیم
     const existingItem = cart.items.find(
-      (item) => item.offer.id === dto.offerId,
+      (item) =>
+        item.offer.id === dto.offerId &&
+        (dto.selectedVariantValueId === undefined ||
+          item.selectedVariantValueId === dto.selectedVariantValueId),
     );
 
     if (existingItem) {
@@ -113,7 +117,7 @@ export class CartService {
         // فیلدهای snapshot
         productName: offer.product.name,
         productSlug: offer.product.slug,
-        productImage: offer?.product?.mainImage || '',
+        productImage: offer.product.mainImage || '',
         sellerName: offer.seller.businessName,
         discountPrice: offer.discountPrice,
         discountPercent: offer.discountPercent || 0,
@@ -122,8 +126,10 @@ export class CartService {
         stock: offer.stock,
         hasWarranty: offer.hasWarranty || false,
         warrantyDescription: offer.warrantyDescription,
-        selectedVariants: {}, // برای بعداً
-        variantNames: {}, // برای بعداً
+        selectedVariantId: dto.selectedVariantId,
+        selectedVariantValueId: dto.selectedVariantValueId,
+        selectedVariantObject: dto.selectedVariantObject,
+        selectedVariantValueObject: dto.selectedVariantValueObject,
       });
 
       await this.cartItemRepo.save(cartItem);
@@ -232,8 +238,13 @@ export class CartService {
     // برای هر آیتم در سبد آفلاین
     for (const offlineItem of syncDto.items) {
       // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
+      // اگر محصول تنوع دارد، به selectedVariantValueId نگاه کنیم
       const existingItem = cart.items.find(
-        (item) => item.offer.id === offlineItem.offerId,
+        (item) =>
+          item.offer.id === offlineItem.offerId &&
+          // اگر محصول تنوع دارد، باید variant value هم یکسان باشد
+          (offlineItem.selectedVariantValueId === undefined ||
+            item.selectedVariantValueId === offlineItem.selectedVariantValueId),
       );
 
       // بررسی وجود پیشنهاد برای دریافت آخرین اطلاعات
@@ -243,12 +254,10 @@ export class CartService {
       });
 
       if (!offer) {
-        // اگر پیشنهاد حذف شده، در این مورد می‌تواند آیتم را نادیده بگیریم یا تجاهل کنیم
         continue;
       }
 
       if (!offer.isActive) {
-        // اگر پیشنهاد غیرفعال است، نادیده بگیریم
         continue;
       }
 
@@ -258,10 +267,9 @@ export class CartService {
         : offlineItem.quantity;
 
       if (offer.stock < totalQuantityNeeded) {
-        // اگر موجودی کافی نیست، از موجودی موجود استفاده کنیم
         const availableQuantity = offer.stock;
         if (availableQuantity === 0) {
-          continue; // اگر موجودی صفر است، نادیده بگیریم
+          continue;
         }
 
         if (existingItem) {
@@ -269,25 +277,28 @@ export class CartService {
         } else {
           // آیتم جدید ایجاد کنیم
           const cartItem = this.cartItemRepo.create({
-            cart,
-            product: offer.product,
+            cart: { id: cart.id },
+            product: { id: offer.product.id },
             offer,
             quantity: availableQuantity,
-            price: offer.discountPrice || offer.price,
+            price: offlineItem.discountPrice || offlineItem.price,
             // اطلاعات snapshot از آفلاین
             productName: offlineItem.productName,
             productSlug: offlineItem.productSlug,
             productImage: offlineItem.productImage,
             sellerName: offlineItem.sellerName,
-            discountPrice: offlineItem.discountPrice || offer.discountPrice,
+            discountPrice: offlineItem.discountPrice,
             discountPercent: offlineItem.discountPercent || 0,
-            minOrder: offlineItem.minOrder,
-            maxOrder: offlineItem.maxOrder,
-            stock: offer.stock, // آخرین موجودی
+            minOrder: offlineItem.minOrder || null,
+            maxOrder: offlineItem.maxOrder || null,
+            stock: offer.stock,
             hasWarranty: offlineItem.hasWarranty,
             warrantyDescription: offlineItem.warrantyDescription,
-            selectedVariants: offlineItem.selectedVariants,
-            variantNames: offlineItem.variantNames,
+            selectedVariantId: offlineItem.selectedVariantId || null,
+            selectedVariantValueId: offlineItem.selectedVariantValueId || null,
+            selectedVariantObject: offlineItem.selectedVariantObject || null,
+            selectedVariantValueObject:
+              offlineItem.selectedVariantValueObject || null,
           });
 
           await this.cartItemRepo.save(cartItem);
@@ -298,46 +309,52 @@ export class CartService {
       if (existingItem) {
         // اگر آیتم وجود داشت، تعداد را ادغام کنیم
         existingItem.quantity = totalQuantityNeeded;
-        // اطلاعات را به‌روزرسانی کنیم از آخرین اطلاعات
-        existingItem.price = offer.discountPrice || offer.price;
+        existingItem.price = offlineItem.discountPrice || offlineItem.price;
         existingItem.productName = offlineItem.productName;
         existingItem.productSlug = offlineItem.productSlug;
-        existingItem.productImage =
-          offlineItem.productImage || existingItem.productImage;
+        existingItem.productImage = offlineItem.productImage || '';
         existingItem.sellerName = offlineItem.sellerName;
-        existingItem.discountPrice =
-          offlineItem.discountPrice || offer.discountPrice;
+        existingItem.discountPrice = offlineItem.discountPrice || 0;
         existingItem.discountPercent = offlineItem.discountPercent || 0;
+        existingItem.minOrder = offlineItem.minOrder || null;
+        existingItem.maxOrder = offlineItem.maxOrder || null;
         existingItem.stock = offer.stock;
         existingItem.hasWarranty = offlineItem.hasWarranty;
         existingItem.warrantyDescription =
-          offlineItem.warrantyDescription || existingItem.warrantyDescription;
-        existingItem.selectedVariants = offlineItem.selectedVariants || {};
-        existingItem.variantNames = offlineItem.variantNames || {};
+          offlineItem.warrantyDescription || '';
+        existingItem.selectedVariantId = offlineItem.selectedVariantId || null;
+        existingItem.selectedVariantValueId =
+          offlineItem.selectedVariantValueId || null;
+        existingItem.selectedVariantObject =
+          offlineItem.selectedVariantObject || {};
+        existingItem.selectedVariantValueObject =
+          offlineItem.selectedVariantValueObject || {};
 
         await this.cartItemRepo.save(existingItem);
       } else {
         // اگر آیتم وجود نداشت، جدید بساز
         const cartItem = this.cartItemRepo.create({
-          cart,
-          product: offer.product,
+          cart: { id: cart.id },
+          product: { id: offer.product.id },
           offer,
           quantity: offlineItem.quantity,
-          price: offer.discountPrice || offer.price,
-          // اطلاعات snapshot
+          price: offlineItem.discountPrice || offlineItem.price,
           productName: offlineItem.productName,
           productSlug: offlineItem.productSlug,
           productImage: offlineItem.productImage,
           sellerName: offlineItem.sellerName,
-          discountPrice: offlineItem.discountPrice || offer.discountPrice,
+          discountPrice: offlineItem.discountPrice,
           discountPercent: offlineItem.discountPercent || 0,
-          minOrder: offlineItem.minOrder,
-          maxOrder: offlineItem.maxOrder,
+          minOrder: offlineItem.minOrder || null,
+          maxOrder: offlineItem.maxOrder || null,
           stock: offer.stock,
           hasWarranty: offlineItem.hasWarranty,
           warrantyDescription: offlineItem.warrantyDescription,
-          selectedVariants: offlineItem.selectedVariants,
-          variantNames: offlineItem.variantNames,
+          selectedVariantId: offlineItem.selectedVariantId || null,
+          selectedVariantValueId: offlineItem.selectedVariantValueId || null,
+          selectedVariantObject: offlineItem.selectedVariantObject || null,
+          selectedVariantValueObject:
+            offlineItem.selectedVariantValueObject || null,
         });
 
         await this.cartItemRepo.save(cartItem);
