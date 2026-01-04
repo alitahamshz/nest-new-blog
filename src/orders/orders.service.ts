@@ -54,12 +54,7 @@ export class OrdersService {
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
         where: { user: { id: createDto.userId } },
-        relations: [
-          'items',
-          'items.offer',
-          'items.product',
-          'items.variantValues',
-        ],
+        relations: ['items', 'items.offer', 'items.product'],
       });
 
       if (!cart || cart.items.length === 0) {
@@ -107,12 +102,12 @@ export class OrdersService {
 
         const orderItem = queryRunner.manager.create(OrderItem, {
           product: cartItem.product,
-          variantValues: cartItem.variantValues,
+          variantValues: offer.variantValues,
           seller: offer.seller,
           offer: offer,
           productName: cartItem.product.name,
-          variantValueNames: cartItem.variantValues
-            ? cartItem.variantValues.map((v) => v.name).join(' - ')
+          variantValueNames: offer.variantValues
+            ? offer.variantValues.map((v) => v.name).join(' - ')
             : undefined,
           sellerBusinessName: offer.seller.businessName,
           quantity: cartItem.quantity,

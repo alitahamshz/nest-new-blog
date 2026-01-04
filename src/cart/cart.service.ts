@@ -35,7 +35,6 @@ export class CartService {
       relations: [
         'items',
         'items.product',
-        'items.variantValues',
         'items.offer',
         'items.offer.seller',
       ],
@@ -230,22 +229,29 @@ export class CartService {
 
   /**
    * سینک کردن سبد خرید آفلاین با سبد خرید آنلاین
-   * اگر کاربر آفلاین بود و سبد خرید ایجاد کرد، هنگام آنلاین شدن سبد‌ها ادغام می‌شوند
+   * منطق: فقط محصولات جدید اضافه میشود، اگر محصول موجود باشد اضافه نمی‌شود
    */
   async syncCart(userId: number, syncDto: SyncCartDto): Promise<Cart> {
-    const cart = await this.getOrCreateCart(userId);
+    let cart = await this.getOrCreateCart(userId);
 
     // برای هر آیتم در سبد آفلاین
     for (const offlineItem of syncDto.items) {
+      // دوباره cart رو دریافت کن تا items تازه باشند
+      cart = await this.getOrCreateCart(userId);
+
       // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
-      // اگر محصول تنوع دارد، به selectedVariantValueId نگاه کنیم
+      // تطابق بر اساس: productId + selectedVariantValueId (دقیق)
+      // اگر محصول variant دارد، variant value هم باید دقیقا یکسان باشد
       const existingItem = cart.items.find(
         (item) =>
-          item.offer.id === offlineItem.offerId &&
-          // اگر محصول تنوع دارد، باید variant value هم یکسان باشد
-          (offlineItem.selectedVariantValueId === undefined ||
-            item.selectedVariantValueId === offlineItem.selectedVariantValueId),
+          item.product.id === offer.product.id &&
+          item.selectedVariantValueId === offlineItem.selectedVariantValueId,
       );
+
+      // اگر این محصول قبلاً در سبد وجود دارد، رد کن (تکراری نیست)
+      if (existingItem) {
+        continue;
+      }
 
       // بررسی وجود پیشنهاد برای دریافت آخرین اطلاعات
       const offer = await this.offerRepo.findOne({
@@ -257,108 +263,46 @@ export class CartService {
         continue;
       }
 
+      // بررسی اینکه پیشنهاد فعال است یا نه
       if (!offer.isActive) {
         continue;
       }
 
-      // بررسی موجودی کافی برای تعداد درخواست شده
-      const totalQuantityNeeded = existingItem
-        ? existingItem.quantity + offlineItem.quantity
-        : offlineItem.quantity;
+      // بررسی موجودی برای تعداد درخواست شده
+      const requestedQuantity = offlineItem.quantity;
+      const availableQuantity = Math.min(requestedQuantity, offer.stock);
 
-      if (offer.stock < totalQuantityNeeded) {
-        const availableQuantity = offer.stock;
-        if (availableQuantity === 0) {
-          continue;
-        }
-
-        if (existingItem) {
-          existingItem.quantity = availableQuantity;
-        } else {
-          // آیتم جدید ایجاد کنیم
-          const cartItem = this.cartItemRepo.create({
-            cart: { id: cart.id },
-            product: { id: offer.product.id },
-            offer,
-            quantity: availableQuantity,
-            price: offlineItem.discountPrice || offlineItem.price,
-            // اطلاعات snapshot از آفلاین
-            productName: offlineItem.productName,
-            productSlug: offlineItem.productSlug,
-            productImage: offlineItem.productImage,
-            sellerName: offlineItem.sellerName,
-            discountPrice: offlineItem.discountPrice,
-            discountPercent: offlineItem.discountPercent || 0,
-            minOrder: offlineItem.minOrder || null,
-            maxOrder: offlineItem.maxOrder || null,
-            stock: offer.stock,
-            hasWarranty: offlineItem.hasWarranty,
-            warrantyDescription: offlineItem.warrantyDescription,
-            selectedVariantId: offlineItem.selectedVariantId || null,
-            selectedVariantValueId: offlineItem.selectedVariantValueId || null,
-            selectedVariantObject: offlineItem.selectedVariantObject || null,
-            selectedVariantValueObject:
-              offlineItem.selectedVariantValueObject || null,
-          });
-
-          await this.cartItemRepo.save(cartItem);
-          continue;
-        }
+      if (availableQuantity === 0) {
+        continue;
       }
 
-      if (existingItem) {
-        // اگر آیتم وجود داشت، تعداد را ادغام کنیم
-        existingItem.quantity = totalQuantityNeeded;
-        existingItem.price = offlineItem.discountPrice || offlineItem.price;
-        existingItem.productName = offlineItem.productName;
-        existingItem.productSlug = offlineItem.productSlug;
-        existingItem.productImage = offlineItem.productImage || '';
-        existingItem.sellerName = offlineItem.sellerName;
-        existingItem.discountPrice = offlineItem.discountPrice || 0;
-        existingItem.discountPercent = offlineItem.discountPercent || 0;
-        existingItem.minOrder = offlineItem.minOrder || null;
-        existingItem.maxOrder = offlineItem.maxOrder || null;
-        existingItem.stock = offer.stock;
-        existingItem.hasWarranty = offlineItem.hasWarranty;
-        existingItem.warrantyDescription =
-          offlineItem.warrantyDescription || '';
-        existingItem.selectedVariantId = offlineItem.selectedVariantId || null;
-        existingItem.selectedVariantValueId =
-          offlineItem.selectedVariantValueId || null;
-        existingItem.selectedVariantObject =
-          offlineItem.selectedVariantObject || {};
-        existingItem.selectedVariantValueObject =
-          offlineItem.selectedVariantValueObject || {};
+      // آیتم جدید ایجاد کنیم
+      const cartItem = this.cartItemRepo.create({
+        cart: { id: cart.id },
+        product: { id: offer.product.id },
+        offer,
+        quantity: availableQuantity,
+        price: offlineItem.discountPrice || offlineItem.price,
+        // اطلاعات snapshot از آفلاین
+        productName: offlineItem.productName,
+        productSlug: offlineItem.productSlug,
+        productImage: offlineItem.productImage,
+        sellerName: offlineItem.sellerName,
+        discountPrice: offlineItem.discountPrice,
+        discountPercent: offlineItem.discountPercent || 0,
+        minOrder: offlineItem.minOrder || null,
+        maxOrder: offlineItem.maxOrder || null,
+        stock: offer.stock,
+        hasWarranty: offlineItem.hasWarranty,
+        warrantyDescription: offlineItem.warrantyDescription,
+        selectedVariantId: offlineItem.selectedVariantId || null,
+        selectedVariantValueId: offlineItem.selectedVariantValueId || null,
+        selectedVariantObject: offlineItem.selectedVariantObject || null,
+        selectedVariantValueObject:
+          offlineItem.selectedVariantValueObject || null,
+      });
 
-        await this.cartItemRepo.save(existingItem);
-      } else {
-        // اگر آیتم وجود نداشت، جدید بساز
-        const cartItem = this.cartItemRepo.create({
-          cart: { id: cart.id },
-          product: { id: offer.product.id },
-          offer,
-          quantity: offlineItem.quantity,
-          price: offlineItem.discountPrice || offlineItem.price,
-          productName: offlineItem.productName,
-          productSlug: offlineItem.productSlug,
-          productImage: offlineItem.productImage,
-          sellerName: offlineItem.sellerName,
-          discountPrice: offlineItem.discountPrice,
-          discountPercent: offlineItem.discountPercent || 0,
-          minOrder: offlineItem.minOrder || null,
-          maxOrder: offlineItem.maxOrder || null,
-          stock: offer.stock,
-          hasWarranty: offlineItem.hasWarranty,
-          warrantyDescription: offlineItem.warrantyDescription,
-          selectedVariantId: offlineItem.selectedVariantId || null,
-          selectedVariantValueId: offlineItem.selectedVariantValueId || null,
-          selectedVariantObject: offlineItem.selectedVariantObject || null,
-          selectedVariantValueObject:
-            offlineItem.selectedVariantValueObject || null,
-        });
-
-        await this.cartItemRepo.save(cartItem);
-      }
+      await this.cartItemRepo.save(cartItem);
     }
 
     return await this.getOrCreateCart(userId);
