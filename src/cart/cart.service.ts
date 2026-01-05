@@ -81,30 +81,30 @@ export class CartService {
     }
 
     // بررسی اینکه آیا این آیتم قبلاً در سبد وجود دارد
-    // اگر محصول تنوع دارد، به selectedVariantValueId نگاه کنیم
-    const existingItem = cart.items.find(
-      (item) =>
-        item.offer.id === dto.offerId &&
-        (dto.selectedVariantValueId === undefined ||
-          item.selectedVariantValueId === dto.selectedVariantValueId),
-    );
+    const hasVariants = !!offer.variantValues?.length;
+
+    let existingItem: CartItem | undefined;
+
+    if (hasVariants) {
+      // برای پیشنهاداتی که واریانت دارند، باید selectedVariantValueId دقیقاً برابر باشد
+      existingItem = cart.items.find(
+        (item) =>
+          item.offer.id === offer.id &&
+          item.selectedVariantValueId === dto.selectedVariantValueId,
+      );
+    } else {
+      // اگر پیشنهاد واریانت ندارد، براساس محصول چک کن (واریانت نداشته باشد)
+      existingItem = cart.items.find(
+        (item) =>
+          item.product.id === offer.product.id &&
+          (item.selectedVariantValueId === null ||
+            item.selectedVariantValueId === undefined),
+      );
+    }
 
     if (existingItem) {
-      // اگر وجود داشت، تعداد را افزایش بده
-      const newQuantity = existingItem.quantity + dto.quantity;
-
-      if (offer.stock < newQuantity) {
-        throw new BadRequestException(
-          `موجودی کافی نیست. موجودی فعلی: ${offer.stock}`,
-        );
-      }
-
-      existingItem.quantity = newQuantity;
-      existingItem.price = offer.discountPrice || offer.price;
-      existingItem.discountPrice = offer.discountPrice;
-      existingItem.discountPercent = offer.discountPercent || 0;
-      existingItem.stock = offer.stock;
-      await this.cartItemRepo.save(existingItem);
+      // آیتم دقیقاً وجود دارد — طبق خواسته، هیچ تغییری انجام نمیشه و سبد بازگردانده می‌شود
+      return await this.getOrCreateCart(userId);
     } else {
       // اگر وجود نداشت، آیتم جدید بساز
       const cartItem = this.cartItemRepo.create({
@@ -239,20 +239,6 @@ export class CartService {
       // دوباره cart رو دریافت کن تا items تازه باشند
       cart = await this.getOrCreateCart(userId);
 
-      // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
-      // تطابق بر اساس: productId + selectedVariantValueId (دقیق)
-      // اگر محصول variant دارد، variant value هم باید دقیقا یکسان باشد
-      const existingItem = cart.items.find(
-        (item) =>
-          item.product.id === offer.product.id &&
-          item.selectedVariantValueId === offlineItem.selectedVariantValueId,
-      );
-
-      // اگر این محصول قبلاً در سبد وجود دارد، رد کن (تکراری نیست)
-      if (existingItem) {
-        continue;
-      }
-
       // بررسی وجود پیشنهاد برای دریافت آخرین اطلاعات
       const offer = await this.offerRepo.findOne({
         where: { id: offlineItem.offerId },
@@ -260,6 +246,31 @@ export class CartService {
       });
 
       if (!offer) {
+        continue;
+      }
+
+      // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
+      // تطابق بر اساس: برای واریانت‌ها بر اساس offer+variant value، در غیر این صورت بر اساس product
+      const hasVariants = !!offer.variantValues?.length;
+
+      let existingItem: CartItem | undefined;
+      if (hasVariants) {
+        existingItem = cart.items.find(
+          (item) =>
+            item.offer.id === offer.id &&
+            item.selectedVariantValueId === offlineItem.selectedVariantValueId,
+        );
+      } else {
+        existingItem = cart.items.find(
+          (item) =>
+            item.product.id === offer.product.id &&
+            (item.selectedVariantValueId === null ||
+              item.selectedVariantValueId === undefined),
+        );
+      }
+
+      // اگر این محصول قبلاً در سبد وجود دارد، رد کن (تکراری نیست)
+      if (existingItem) {
         continue;
       }
 
