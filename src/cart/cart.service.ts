@@ -249,29 +249,60 @@ export class CartService {
         continue;
       }
 
-      // بررسی اینکه این آیتم قبلاً در سبد آنلاین وجود دارد یا نه
-      // تطابق بر اساس: برای واریانت‌ها بر اساس offer+variant value، در غیر این صورت بر اساس product
+      // ابتدا بررسی کن آیا محصولی با همان productSlug قبلاً در سبد است
+      const productItems = cart.items.filter(
+        (item) => item.productSlug === offlineItem.productSlug,
+      );
+
       const hasVariants = !!offer.variantValues?.length;
 
-      let existingItem: CartItem | undefined;
-      if (hasVariants) {
-        existingItem = cart.items.find(
+      // اگر محصول با همان slug وجود دارد
+      if (productItems.length > 0) {
+        // اگر آفلاین آیتم واریانت دارد
+        if (
+          offlineItem.selectedVariantValueId !== null &&
+          offlineItem.selectedVariantValueId !== undefined
+        ) {
+          // اگر همان واریانت قبلاً وجود دارد، رد کن
+          const sameVariant = productItems.find(
+            (i) =>
+              i.selectedVariantValueId === offlineItem.selectedVariantValueId,
+          );
+          if (sameVariant) {
+            continue;
+          }
+          // وگرنه (همان محصول با واریانت متفاوت) اجازه بده اضافه بشه بعنوان آیتم جدید
+        } else {
+          // آفلاین آیتم واریانت ندارد و محصول با همان slug قبلاً هست — رد کن
+          continue;
+        }
+      }
+
+      // اگر هیچ محصولی با همان slug وجود نداشت، یا تصمیم گرفتیم اضافه شود (مثلاً واریانت متفاوت)،
+      // بررسی تکمیلی بر اساس اینکه پیشنهاد واریانت دارد یا خیر تا از تکراری بودن جلوگیری کنیم
+      if (
+        hasVariants &&
+        offlineItem.selectedVariantValueId !== null &&
+        offlineItem.selectedVariantValueId !== undefined
+      ) {
+        const variantExisting = cart.items.find(
           (item) =>
             item.offer.id === offer.id &&
             item.selectedVariantValueId === offlineItem.selectedVariantValueId,
         );
-      } else {
-        existingItem = cart.items.find(
+        if (variantExisting) {
+          continue;
+        }
+      } else if (!hasVariants) {
+        const simpleExisting = cart.items.find(
           (item) =>
             item.product.id === offer.product.id &&
             (item.selectedVariantValueId === null ||
               item.selectedVariantValueId === undefined),
         );
-      }
-
-      // اگر این محصول قبلاً در سبد وجود دارد، رد کن (تکراری نیست)
-      if (existingItem) {
-        continue;
+        if (simpleExisting) {
+          continue;
+        }
       }
 
       // بررسی اینکه پیشنهاد فعال است یا نه
