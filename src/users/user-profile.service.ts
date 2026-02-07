@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserProfile } from 'src/entities/user-profile.entity';
 import { Address } from 'src/entities/address.entity';
+import { User } from 'src/entities/user.entity';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
@@ -16,6 +17,8 @@ export class UserProfileService {
     private readonly profileRepo: Repository<UserProfile>,
     @InjectRepository(Address)
     private readonly addressRepo: Repository<Address>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   async create(
@@ -49,74 +52,75 @@ export class UserProfileService {
   // ========== مدیریت آدرس‌ها ==========
 
   /**
-   * دریافت تمام آدرس‌های کاربر
+   * دریافت تمام آدرس‌های کاربر (بدون نیاز به پروفایل)
    */
   async getAddresses(userId: number): Promise<Address[]> {
-    const profile = await this.profileRepo.findOne({
+    const addresses = await this.addressRepo.find({
       where: { user: { id: userId } },
-      relations: ['addresses'],
+      order: { isDefault: 'DESC', createdAt: 'DESC' },
     });
-    if (!profile) throw new NotFoundException('Profile not found');
-    return profile.addresses || [];
+    return addresses || [];
   }
 
   /**
-   * دریافت آدرس پیش‌فرض کاربر
+   * دریافت آدرس پیش‌فرض کاربر (بدون نیاز به پروفایل)
    */
   async getDefaultAddress(userId: number): Promise<Address | null> {
-    const profile = await this.profileRepo.findOne({
-      where: { user: { id: userId } },
-    });
-    if (!profile) throw new NotFoundException('Profile not found');
-
     return await this.addressRepo.findOne({
-      where: { userProfile: { id: profile.id }, isDefault: true },
+      where: { user: { id: userId }, isDefault: true },
     });
   }
 
   /**
-   * افزودن آدرس جدید
+   * افزودن آدرس جدید (بدون نیاز به پروفایل)
+   * اگر پروفایل وجود نداشت، خودکار آن را ایجاد می‌کند
    */
   async addAddress(userId: number, dto: CreateAddressDto): Promise<Address> {
-    const profile = await this.profileRepo.findOne({
-      where: { user: { id: userId } },
+    // بررسی وجود کاربر
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
       relations: ['addresses'],
     });
-    if (!profile) throw new NotFoundException('Profile not found');
+    if (!user) throw new NotFoundException('User not found');
+
+    // بررسی وجود پروفایل و ایجاد آن در صورت عدم وجود
+    let profile = await this.profileRepo.findOne({
+      where: { user: { id: userId } },
+    });
+    if (!profile) {
+      profile = this.profileRepo.create({ user: { id: userId } });
+      await this.profileRepo.save(profile);
+    }
 
     // اگر این اولین آدرس هست یا کاربر خواسته پیش‌فرض باشه
-    if (dto.isDefault || !profile.addresses || profile.addresses.length === 0) {
+    if (dto.isDefault || !user.addresses || user.addresses.length === 0) {
       // همه آدرس‌های قبلی رو غیرپیش‌فرض کن
       await this.addressRepo.update(
-        { userProfile: { id: profile.id } },
+        { user: { id: userId } },
         { isDefault: false },
       );
     }
 
     const address = this.addressRepo.create({
       ...dto,
+      user: { id: userId },
       userProfile: profile,
-      isDefault: dto.isDefault || profile.addresses.length === 0, // اولین آدرس همیشه پیش‌فرض
+      isDefault: dto.isDefault || (user.addresses && user.addresses.length === 0),
     });
 
     return await this.addressRepo.save(address);
   }
 
   /**
-   * بروزرسانی آدرس
+   * بروزرسانی آدرس (بدون نیاز به پروفایل)
    */
   async updateAddress(
     userId: number,
     addressId: number,
     dto: UpdateAddressDto,
   ): Promise<Address> {
-    const profile = await this.profileRepo.findOne({
-      where: { user: { id: userId } },
-    });
-    if (!profile) throw new NotFoundException('Profile not found');
-
     const address = await this.addressRepo.findOne({
-      where: { id: addressId, userProfile: { id: profile.id } },
+      where: { id: addressId, user: { id: userId } },
     });
     if (!address)
       throw new NotFoundException('Address not found or not owned by user');
@@ -124,7 +128,7 @@ export class UserProfileService {
     // اگر میخواد این آدرس رو پیش‌فرض کنه
     if (dto.isDefault && !address.isDefault) {
       await this.addressRepo.update(
-        { userProfile: { id: profile.id } },
+        { user: { id: userId } },
         { isDefault: false },
       );
     }
@@ -134,17 +138,11 @@ export class UserProfileService {
   }
 
   /**
-   * حذف آدرس
+   * حذف آدرس (بدون نیاز به پروفایل)
    */
   async removeAddress(userId: number, addressId: number): Promise<void> {
-    const profile = await this.profileRepo.findOne({
-      where: { user: { id: userId } },
-      relations: ['addresses'],
-    });
-    if (!profile) throw new NotFoundException('Profile not found');
-
     const address = await this.addressRepo.findOne({
-      where: { id: addressId, userProfile: { id: profile.id } },
+      where: { id: addressId, user: { id: userId } },
     });
     if (!address)
       throw new NotFoundException('Address not found or not owned by user');
@@ -153,9 +151,9 @@ export class UserProfileService {
     await this.addressRepo.remove(address);
 
     // اگر آدرس پیش‌فرض حذف شد، اولین آدرس رو پیش‌فرض کن
-    if (wasDefault && profile.addresses.length > 1) {
+    if (wasDefault) {
       const firstAddress = await this.addressRepo.findOne({
-        where: { userProfile: { id: profile.id } },
+        where: { user: { id: userId } },
         order: { id: 'ASC' },
       });
       if (firstAddress) {
@@ -166,23 +164,18 @@ export class UserProfileService {
   }
 
   /**
-   * تنظیم آدرس پیش‌فرض
+   * تنظیم آدرس پیش‌فرض (بدون نیاز به پروفایل)
    */
   async setDefaultAddress(userId: number, addressId: number): Promise<Address> {
-    const profile = await this.profileRepo.findOne({
-      where: { user: { id: userId } },
-    });
-    if (!profile) throw new NotFoundException('Profile not found');
-
     const address = await this.addressRepo.findOne({
-      where: { id: addressId, userProfile: { id: profile.id } },
+      where: { id: addressId, user: { id: userId } },
     });
     if (!address)
       throw new NotFoundException('Address not found or not owned by user');
 
     // همه آدرس‌ها رو غیرپیش‌فرض کن
     await this.addressRepo.update(
-      { userProfile: { id: profile.id } },
+      { user: { id: userId } },
       { isDefault: false },
     );
 

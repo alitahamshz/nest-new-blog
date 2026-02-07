@@ -12,6 +12,7 @@ import { Post } from 'src/entities/post.entity';
 import { Comment } from 'src/entities/comment.entity';
 import { UserProfile } from 'src/entities/user-profile.entity';
 import { Seller } from 'src/entities/seller.entity';
+import { Address } from 'src/entities/address.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity('users')
@@ -49,4 +50,8 @@ export class User {
   // ارتباط با فروشنده (اختیاری - اگر کاربر فروشنده باشه)
   @OneToOne(() => Seller, (seller) => seller.user)
   seller: Seller;
+
+  // ارتباط با آدرس‌ها (کاربر می‌تواند چندین آدرس داشته باشد)
+  @OneToMany(() => Address, (address) => address.user)
+  addresses: Address[];
 }

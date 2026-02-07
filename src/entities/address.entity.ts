@@ -7,14 +7,21 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UserProfile } from './user-profile.entity';
+import { User } from './user.entity';
 
 @Entity('addresses')
 export class Address {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => UserProfile, (profile) => profile.addresses, {
+  @ManyToOne(() => User, (user) => user.addresses, {
     onDelete: 'CASCADE',
+  })
+  user: User;
+
+  @ManyToOne(() => UserProfile, (profile) => profile.addresses, {
+    onDelete: 'SET NULL',
+    nullable: true,
   })
   userProfile: UserProfile;
 
