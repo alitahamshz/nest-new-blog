@@ -1,11 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, Between, DataSource } from 'typeorm';
+import { Repository, Between, DataSource, LessThan } from 'typeorm';
+import { Cron } from '@nestjs/schedule';
 import { Order } from '../entities/order.entity';
 import { OrderItem } from '../entities/order-item.entity';
 import { CartItem } from '../entities/cart-item.entity';
@@ -18,6 +22,8 @@ import { OrderStatus, PaymentStatus } from '../entities/order.enums';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -369,7 +375,7 @@ export class OrdersService {
   }
 
   /**
-   * بروزرسانی سفارش
+   * بروزرسانی سفارش توسط کاربر (فقط یادداشت)
    */
   async update(
     id: number,
@@ -383,20 +389,67 @@ export class OrdersService {
       throw new ForbiddenException('شما این سفارش را مالکیت ندارید');
     }
 
-    // بروزرسانی تاریخ‌های مربوطه
-    if (updateDto.paymentStatus === PaymentStatus.COMPLETED && !order.paidAt) {
-      order.paidAt = new Date();
+    // کاربر فقط می‌تونه یادداشت خودش رو آپدیت کنه
+    // (ادمین endpoints برای تغییر status)
+    if (updateDto.customerNote !== undefined) {
+      order.customerNote = updateDto.customerNote;
     }
 
-    if (updateDto.status === OrderStatus.SHIPPED && !order.shippedAt) {
-      order.shippedAt = new Date();
+    return await this.orderRepo.save(order);
+  }
+
+  /**
+   * تغییر وضعیت سفارش توسط ادمین
+   */
+  async updateOrderStatus(
+    id: number,
+    updateDto: UpdateOrderDto,
+  ): Promise<Order> {
+    const order = await this.findOne(id);
+
+    // Validate status transitions
+    if (updateDto.status) {
+      const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+        [OrderStatus.PENDING]: [OrderStatus.PAID, OrderStatus.CANCELLED],
+        [OrderStatus.PAID]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+        [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+        [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED],
+        [OrderStatus.DELIVERED]: [],
+        [OrderStatus.CANCELLED]: [],
+        [OrderStatus.REFUNDED]: [],
+      };
+
+      if (!validTransitions[order.status]?.includes(updateDto.status)) {
+        throw new BadRequestException(
+          `نمی‌توان سفارش از وضعیت ${order.status} به ${updateDto.status} تغییر داد`,
+        );
+      }
+
+      order.status = updateDto.status;
+
+      // Set timestamps
+      if (updateDto.status === OrderStatus.SHIPPED && !order.shippedAt) {
+        order.shippedAt = new Date();
+      }
+
+      if (updateDto.status === OrderStatus.DELIVERED && !order.deliveredAt) {
+        order.deliveredAt = new Date();
+      }
     }
 
-    if (updateDto.status === OrderStatus.DELIVERED && !order.deliveredAt) {
-      order.deliveredAt = new Date();
+    // Update admin fields
+    if (updateDto.trackingNumber) {
+      order.trackingNumber = updateDto.trackingNumber;
     }
 
-    Object.assign(order, updateDto);
+    if (updateDto.carrier) {
+      order.carrier = updateDto.carrier;
+    }
+
+    if (updateDto.adminNote) {
+      order.adminNote = updateDto.adminNote;
+    }
+
     return await this.orderRepo.save(order);
   }
 
@@ -447,12 +500,12 @@ export class OrdersService {
   async confirmPayment(
     id: number,
     transactionId: string,
-    user: User,
+    user?: User,
   ): Promise<Order> {
     const order = await this.findOne(id);
 
-    // بررسی ownership
-    if (order.user.id !== user.id) {
+    // بررسی ownership (اگر user داده شده باشد)
+    if (user && order.user.id !== user.id) {
       throw new ForbiddenException('شما این سفارش را مالکیت ندارید');
     }
 
@@ -493,7 +546,7 @@ export class OrdersService {
   private calculateShippingCost(subtotal: number): number {
     // ارسال رایگان برای خریدهای بالای 500 هزار تومان
     if (subtotal >= 500000) {
-      return 0;
+      return 30000;
     }
     // هزینه ارسال ثابت 30 هزار تومان
     return 30000;
@@ -503,6 +556,65 @@ export class OrdersService {
    * محاسبه مالیات (9%)
    */
   private calculateTax(subtotal: number): number {
-    return Math.round(subtotal * 0.09);
+    return Math.round(subtotal * 0.1);
+  }
+
+  /**
+   * حذف خودکار سفارشات Unpaid بعد 15 دقیقه (Cron Job)
+   * هر 5 دقیقه یکبار اجرا می‌شود
+   */
+  @Cron('*/5 * * * *')
+  async handleUnpaidOrdersExpiry() {
+    try {
+      this.logger.debug('شروع Cron: حذف سفارشات منقضی‌شده');
+
+      // محاسبه 15 دقیقه پیش
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+
+      // یافتن تمام سفارشات Pending قدیمی‌تر از 15 دقیقه
+      const expiredOrders = await this.orderRepo.find({
+        where: {
+          paymentStatus: PaymentStatus.PENDING,
+          createdAt: LessThan(fifteenMinsAgo),
+        },
+        relations: ['items', 'items.offer'],
+      });
+
+      if (expiredOrders.length === 0) {
+        this.logger.debug('هیچ سفارش منقضی‌شده‌ای یافت نشد');
+        return;
+      }
+
+      this.logger.log(
+        `${expiredOrders.length} سفارش منقضی‌شده برای حذف یافت شد`,
+      );
+
+      // حذف و برگرداندن موجودی
+      for (const order of expiredOrders) {
+        await this.refundOrderStock(order);
+        await this.orderRepo.remove(order);
+
+        this.logger.log(`سفارش ${order.orderNumber} حذف و موجودی برگردانده شد`);
+      }
+
+      this.logger.log(`${expiredOrders.length} سفارش با موفقیت حذف شد`);
+    } catch (error) {
+      this.logger.error(
+        `خطا در Cron Job حذف سفارشات: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * برگرداندن موجودی محصولات (Refund)
+   */
+  private async refundOrderStock(order: Order): Promise<void> {
+    for (const item of order.items) {
+      if (item.offer) {
+        item.offer.stock += item.quantity;
+        await this.offerRepo.save(item.offer);
+      }
+    }
   }
 }

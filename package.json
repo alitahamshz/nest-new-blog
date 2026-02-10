@@ -22,8 +22,7 @@
     "typeorm:js": "node ./node_modules/typeorm/cli.js -d dist/data-source.js",
     "migration:generate": "npm run typeorm:ts -- migration:generate -o",
     "migration:run": "npm run typeorm:js -- migration:run",
-    "migration:revert": "npm run typeorm:js -- migration:revert"
-    ,
+    "migration:revert": "npm run typeorm:js -- migration:revert",
     "seed:roles": "ts-node -r tsconfig-paths/register src/seeds/seed-roles.ts"
   },
   "dependencies": {
@@ -34,6 +33,7 @@
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^6.0.0",

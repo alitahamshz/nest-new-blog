@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsString, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsEnum, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderStatus, PaymentStatus } from '../../entities/order.enums';
 
@@ -6,9 +6,12 @@ export class UpdateOrderDto {
   @ApiPropertyOptional({
     description: 'وضعیت سفارش',
     enum: OrderStatus,
+    example: OrderStatus.PROCESSING,
   })
   @IsOptional()
-  @IsEnum(OrderStatus)
+  @IsEnum(OrderStatus, {
+    message: 'وضعیت سفارش نامعتبر است',
+  })
   status?: OrderStatus;
 
   @ApiPropertyOptional({
@@ -16,20 +19,40 @@ export class UpdateOrderDto {
     enum: PaymentStatus,
   })
   @IsOptional()
-  @IsEnum(PaymentStatus)
+  @IsEnum(PaymentStatus, {
+    message: 'وضعیت پرداخت نامعتبر است',
+  })
   paymentStatus?: PaymentStatus;
 
   @ApiPropertyOptional({
     description: 'کد رهگیری',
+    example: '1234567890',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'کد رهگیری باید متن باشد' })
   trackingNumber?: string;
 
   @ApiPropertyOptional({
-    description: 'یادداشت ادمین',
+    description: 'شرکت پستی',
+    example: 'پست ایران',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'نام شرکت پستی باید متن باشد' })
+  carrier?: string;
+
+  @ApiPropertyOptional({
+    description: 'یادداشت ادمین',
+    example: 'سفارش آماده ارسال است',
+  })
+  @IsOptional()
+  @IsString({ message: 'یادداشت ادمین باید متن باشد' })
   adminNote?: string;
+
+  @ApiPropertyOptional({
+    description: 'یادداشت کاربر',
+    example: 'لطفاً جعبه‌ی محکمی استفاده کنید',
+  })
+  @IsOptional()
+  @IsString({ message: 'یادداشت کاربر باید متن باشد' })
+  customerNote?: string;
 }

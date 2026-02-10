@@ -24,6 +24,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { User } from '../entities/user.entity';
+import { OrderStatus } from '../entities/order.enums';
 
 @ApiTags('Orders')
 @Controller('orders')
@@ -145,7 +146,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch(':id')
-  @ApiOperation({ summary: 'بروزرسانی سفارش' })
+  @ApiOperation({ summary: 'بروزرسانی سفارش (کاربر - فقط یادداشت)' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
   @ApiResponse({
     status: 200,
@@ -161,8 +162,70 @@ export class OrdersController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Patch(':id/admin/status')
+  @ApiOperation({ summary: 'تغییر وضعیت سفارش (ادمین)' })
+  @ApiParam({ name: 'id', description: 'شناسه سفارش' })
+  @ApiResponse({
+    status: 200,
+    description: 'وضعیت سفارش تغییر کرد',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'انتقال وضعیت نامعتبر است',
+  })
+  async updateOrderStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateOrderDto,
+  ) {
+    return await this.ordersService.updateOrderStatus(id, updateDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/admin/shipped')
+  @ApiOperation({
+    summary: 'علامت‌گذاری سفارش به عنوان ارسال‌شده و ثبت رهگیری',
+  })
+  @ApiParam({ name: 'id', description: 'شناسه سفارش' })
+  @ApiResponse({
+    status: 200,
+    description: 'سفارش به حالت ارسال‌شده تغییر کرد',
+  })
+  async markAsShipped(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateOrderDto,
+  ) {
+    return await this.ordersService.updateOrderStatus(id, {
+      status: OrderStatus.SHIPPED,
+      trackingNumber: updateDto.trackingNumber,
+      carrier: updateDto.carrier,
+      adminNote: updateDto.adminNote,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/admin/delivered')
+  @ApiOperation({ summary: 'علامت‌گذاری سفارش به عنوان تحویل‌شده' })
+  @ApiParam({ name: 'id', description: 'شناسه سفارش' })
+  @ApiResponse({
+    status: 200,
+    description: 'سفارش به حالت تحویل‌شده تغییر کرد',
+  })
+  async markAsDelivered(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateOrderDto,
+  ) {
+    return await this.ordersService.updateOrderStatus(id, {
+      status: OrderStatus.DELIVERED,
+      adminNote: updateDto.adminNote,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Patch(':id/cancel')
-  @ApiOperation({ summary: 'لغو سفارش' })
+  @ApiOperation({ summary: 'لغو سفارش (کاربر)' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
   @ApiQuery({ name: 'reason', description: 'دلیل لغو', required: true })
   @ApiResponse({
@@ -184,7 +247,7 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Patch(':id/confirm-payment')
-  @ApiOperation({ summary: 'تایید پرداخت سفارش' })
+  @ApiOperation({ summary: 'تایید پرداخت سفارش (Webhook)' })
   @ApiParam({ name: 'id', description: 'شناسه سفارش' })
   @ApiQuery({
     name: 'transactionId',

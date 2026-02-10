@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PostsModule } from './posts/posts.module';
 import { CategoryModule } from './category/category.module';
 import { TagsModule } from './tags/tags.module';
@@ -22,12 +23,14 @@ import { ProductVariantValueModule } from './product-variant-value/product-varia
 import { ProductSpecificationModule } from './product-specification/product-specification.module';
 import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
+import { PaymentModule } from './payments/payment.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true, // همه‌جا در دسترس باشه
     }),
+    ScheduleModule.forRoot(), // Cron Jobs فعال کن
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
@@ -57,6 +60,7 @@ import { OrdersModule } from './orders/orders.module';
     ProductSpecificationModule,
     CartModule,
     OrdersModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

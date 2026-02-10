@@ -86,6 +86,9 @@ export class Order {
   @Column({ nullable: true })
   trackingNumber: string; // کد رهگیری
 
+  @Column({ nullable: true })
+  carrier: string; // شرکت پستی (پست ایران، ...)
+
   @Column({ type: 'timestamp', nullable: true })
   shippedAt: Date;
 
