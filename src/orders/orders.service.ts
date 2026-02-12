@@ -121,6 +121,11 @@ export class OrdersService {
           subtotal: itemSubtotal,
           discount: 0,
           total: itemSubtotal,
+          minOrder: offer.minOrder || 1,
+          maxOrder: offer.maxOrder || 999,
+          stock: offer.stock,
+          discountPrice: offer.discountPrice || cartItem.price,
+          discountPercent: offer.discountPercent || 0,
         });
 
         orderItems.push(orderItem);
@@ -243,6 +248,11 @@ export class OrdersService {
           subtotal: itemSubtotal,
           discount: 0,
           total: itemSubtotal,
+          minOrder: offer.minOrder || 1,
+          maxOrder: offer.maxOrder || 999,
+          stock: offer.stock,
+          discountPrice: offer.discountPrice || offer.price,
+          discountPercent: offer.discountPercent || 0,
         });
 
         orderItems.push(orderItem);

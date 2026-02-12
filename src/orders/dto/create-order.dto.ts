@@ -26,13 +26,13 @@ class OrderItemDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({
-    description: 'شناسه کاربر',
+  @ApiPropertyOptional({
+    description: 'شناسه کاربر (خودکار از JWT پر می‌شود)',
     example: 1,
   })
-  @IsNotEmpty({ message: 'شناسه کاربر الزامی است' })
+  @IsOptional()
   @IsNumber({}, { message: 'شناسه کاربر باید عدد باشد' })
-  userId: number;
+  userId?: number;
 
   @ApiPropertyOptional({
     description: 'آدرس ارسال (JSON یا متن)',

@@ -44,9 +44,7 @@ export class OrdersController {
     description: 'سبد خرید خالی است یا موجودی کافی نیست',
   })
   async create(@Body() createDto: CreateOrderDto, @CurrentUser() user: User) {
-    if (user.id !== createDto.userId) {
-      throw new ForbiddenException('شما نمی‌تواند سفارش دیگران را ایجاد کنید');
-    }
+    createDto.userId = user.id;
     return await this.ordersService.createOrder(createDto);
   }
 
