@@ -172,6 +172,19 @@ export class CartController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
+  @Delete()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'خالی کردن سبد خرید (از توکن استفاده می‌کند)' })
+  @ApiResponse({
+    status: 204,
+    description: 'سبد خرید خالی شد',
+  })
+  async clearMyCart(@CurrentUser() user: User) {
+    await this.cartService.clearCart(user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Delete(':userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'خالی کردن سبد خرید' })

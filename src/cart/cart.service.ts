@@ -197,7 +197,7 @@ export class CartService {
     const cart = await this.getOrCreateCart(userId);
 
     if (cart.items.length > 0) {
-      await this.cartItemRepo.remove(cart.items);
+      await this.cartItemRepo.delete({ cart: { id: cart.id } });
     }
   }
 

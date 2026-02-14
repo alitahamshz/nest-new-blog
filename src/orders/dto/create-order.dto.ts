@@ -23,6 +23,24 @@ class OrderItemDto {
   @IsNumber({}, { message: 'تعداد باید عدد باشد' })
   @Min(1, { message: 'تعداد باید حداقل 1 باشد' })
   quantity: number;
+
+  @ApiPropertyOptional({ description: 'شناسه واریانت انتخاب‌شده' })
+  @IsOptional()
+  @IsNumber({}, { message: 'selectedVariantId باید عدد باشد' })
+  selectedVariantId?: number;
+
+  @ApiPropertyOptional({ description: 'شناسه مقدار واریانت انتخاب‌شده' })
+  @IsOptional()
+  @IsNumber({}, { message: 'selectedVariantValueId باید عدد باشد' })
+  selectedVariantValueId?: number;
+
+  @ApiPropertyOptional({ description: 'آبجکت کامل واریانت انتخاب‌شده' })
+  @IsOptional()
+  selectedVariantObject?: Record<string, any>;
+
+  @ApiPropertyOptional({ description: 'آبجکت کامل مقدار واریانت انتخاب‌شده' })
+  @IsOptional()
+  selectedVariantValueObject?: Record<string, any>;
 }
 
 export class CreateOrderDto {

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -60,13 +61,18 @@ export class OrdersService {
     try {
       const cart = await queryRunner.manager.findOne(Cart, {
         where: { user: { id: createDto.userId } },
-        relations: ['items', 'items.offer', 'items.product'],
+        relations: [
+          'items',
+          'items.offer',
+          'items.product',
+          'items.offer.variantValues',
+          'items.offer.variantValues.variant',
+        ],
       });
 
       if (!cart || cart.items.length === 0) {
         throw new BadRequestException('سبد خرید خالی است');
       }
-
       // تولید شماره سفارش یونیک
       const orderNumber = await this.generateOrderNumber();
 
@@ -90,7 +96,12 @@ export class OrdersService {
         // Load relations after locking (row is already locked)
         const offer = await queryRunner.manager.findOne(SellerOffer, {
           where: { id: lockedOffer.id },
-          relations: ['seller', 'product', 'variantValues'],
+          relations: [
+            'seller',
+            'product',
+            'variantValues',
+            'variantValues.variant',
+          ],
         });
 
         if (!offer) {
@@ -105,13 +116,16 @@ export class OrdersService {
 
         const itemSubtotal = cartItem.price * cartItem.quantity;
         subtotal += itemSubtotal;
+        const fallbackVariantValue = offer.variantValues?.[0];
 
         const orderItem = queryRunner.manager.create(OrderItem, {
           product: cartItem.product,
           variantValues: offer.variantValues,
           seller: offer.seller,
           offer: offer,
-          productName: cartItem.product.name,
+          productName: cartItem.productName,
+          productSlug: cartItem.productSlug,
+          productImage: cartItem.productImage,
           variantValueNames: offer.variantValues
             ? offer.variantValues.map((v) => v.name).join(' - ')
             : undefined,
@@ -121,11 +135,27 @@ export class OrdersService {
           subtotal: itemSubtotal,
           discount: 0,
           total: itemSubtotal,
-          minOrder: offer.minOrder || 1,
-          maxOrder: offer.maxOrder || 999,
-          stock: offer.stock,
-          discountPrice: offer.discountPrice || cartItem.price,
-          discountPercent: offer.discountPercent || 0,
+          minOrder: cartItem.minOrder || offer.minOrder || 1,
+          maxOrder: cartItem.maxOrder || offer.maxOrder || 999,
+          stock: cartItem.stock,
+          discountPrice: cartItem.discountPrice || offer.discountPrice,
+          discountPercent: cartItem.discountPercent || 0,
+          selectedVariantId:
+            cartItem.selectedVariantId ??
+            cartItem.selectedVariantObject?.id ??
+            fallbackVariantValue?.variant?.id ??
+            null,
+          selectedVariantValueId:
+            cartItem.selectedVariantValueId ??
+            cartItem.selectedVariantValueObject?.id ??
+            fallbackVariantValue?.id ??
+            null,
+          selectedVariantObject:
+            cartItem.selectedVariantObject ??
+            fallbackVariantValue?.variant ??
+            null,
+          selectedVariantValueObject:
+            cartItem.selectedVariantValueObject ?? fallbackVariantValue ?? null,
         });
 
         orderItems.push(orderItem);
@@ -158,8 +188,8 @@ export class OrdersService {
 
       const savedOrder = await queryRunner.manager.save(order);
 
-      // remove cart items inside transaction (not the entire cart)
-      await queryRunner.manager.remove(CartItem, cart.items);
+      // حذف تمام آیتم‌های سبد خرید
+      await queryRunner.manager.delete(CartItem, { cart: { id: cart.id } });
 
       await queryRunner.commitTransaction();
       return savedOrder;
@@ -202,7 +232,29 @@ export class OrdersService {
     await queryRunner.startTransaction();
 
     try {
+      const cart = await queryRunner.manager.findOne(Cart, {
+        where: { user: { id: createDto.userId } },
+        relations: ['items', 'items.offer'],
+      });
+
+      const cartItemsByOfferId = new Map<number, CartItem[]>();
+      for (const cartItem of cart?.items ?? []) {
+        const offerId = cartItem.offer?.id;
+        if (!offerId) {
+          continue;
+        }
+        const list = cartItemsByOfferId.get(offerId) ?? [];
+        list.push(cartItem);
+        cartItemsByOfferId.set(offerId, list);
+      }
+
       for (const item of createDto.items) {
+        const matchedCartItem = this.popMatchingCartItem(
+          cartItemsByOfferId,
+          item.offerId,
+          item.selectedVariantValueId,
+        );
+
         // Lock only the offer row to avoid PostgreSQL FOR UPDATE limitation with LEFT JOIN
         const lockedOffer = await queryRunner.manager
           .createQueryBuilder(SellerOffer, 'offer')
@@ -217,7 +269,12 @@ export class OrdersService {
         // Load relations after locking (won't lock these relations, but row is already locked)
         const offer = await queryRunner.manager.findOne(SellerOffer, {
           where: { id: lockedOffer.id },
-          relations: ['seller', 'product', 'variantValues'],
+          relations: [
+            'seller',
+            'product',
+            'variantValues',
+            'variantValues.variant',
+          ],
         });
 
         if (!offer) {
@@ -232,6 +289,31 @@ export class OrdersService {
 
         const itemSubtotal = offer.discountPrice * item.quantity;
         subtotal += itemSubtotal;
+        const fallbackVariantValue = offer.variantValues?.[0];
+        const selectedVariantId =
+          item.selectedVariantId ??
+          item.selectedVariantObject?.id ??
+          matchedCartItem?.selectedVariantId ??
+          matchedCartItem?.selectedVariantObject?.id ??
+          fallbackVariantValue?.variant?.id ??
+          null;
+        const selectedVariantValueId =
+          item.selectedVariantValueId ??
+          item.selectedVariantValueObject?.id ??
+          matchedCartItem?.selectedVariantValueId ??
+          matchedCartItem?.selectedVariantValueObject?.id ??
+          fallbackVariantValue?.id ??
+          null;
+        const selectedVariantObject =
+          item.selectedVariantObject ??
+          matchedCartItem?.selectedVariantObject ??
+          fallbackVariantValue?.variant ??
+          null;
+        const selectedVariantValueObject =
+          item.selectedVariantValueObject ??
+          matchedCartItem?.selectedVariantValueObject ??
+          fallbackVariantValue ??
+          null;
 
         const orderItem = queryRunner.manager.create(OrderItem, {
           product: offer.product,
@@ -239,6 +321,8 @@ export class OrdersService {
           seller: offer.seller,
           offer,
           productName: offer.product.name,
+          productSlug: offer.product.slug,
+          productImage: offer.product.mainImage,
           variantValueNames: offer.variantValues
             ? offer.variantValues.map((v) => v.name).join(' - ')
             : undefined,
@@ -253,6 +337,10 @@ export class OrdersService {
           stock: offer.stock,
           discountPrice: offer.discountPrice || offer.price,
           discountPercent: offer.discountPercent || 0,
+          selectedVariantId,
+          selectedVariantValueId,
+          selectedVariantObject,
+          selectedVariantValueObject,
         });
 
         orderItems.push(orderItem);
@@ -293,6 +381,32 @@ export class OrdersService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  private popMatchingCartItem(
+    cartItemsByOfferId: Map<number, CartItem[]>,
+    offerId: number,
+    selectedVariantValueId?: number | null,
+  ): CartItem | null {
+    const candidates = cartItemsByOfferId.get(offerId);
+    if (!candidates || candidates.length === 0) {
+      return null;
+    }
+
+    if (
+      selectedVariantValueId !== undefined &&
+      selectedVariantValueId !== null
+    ) {
+      const index = candidates.findIndex(
+        (item) => item.selectedVariantValueId === selectedVariantValueId,
+      );
+      if (index >= 0) {
+        const [matched] = candidates.splice(index, 1);
+        return matched;
+      }
+    }
+
+    return candidates.shift() ?? null;
   }
 
   /**
