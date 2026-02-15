@@ -11,8 +11,10 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductImage } from '../entities/product-image.entity';
 import { ProductSpecification } from '../entities/product-specification.entity';
 import { Tag } from '../entities/tag.entity';
+import { SellerOffer } from '../entities/seller-offer.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { FilterProductsDto, SortBy } from './dto/filter-products.dto';
 import slugify from 'slugify';
 
 @Injectable()
@@ -30,6 +32,8 @@ export class ProductsService {
     private readonly imageRepo: Repository<ProductImage>,
     @InjectRepository(ProductSpecification)
     private readonly specificationRepo: Repository<ProductSpecification>,
+    @InjectRepository(SellerOffer)
+    private readonly offerRepo: Repository<SellerOffer>,
   ) {}
 
   /**
@@ -136,14 +140,253 @@ export class ProductsService {
   }
 
   /**
-   * دریافت لیست محصولات با صفحه‌بندی و فیلتر
+   * دریافت لیست محصولات با فیلتر‌های پیشرفته
    */
-  async findAll(
+  async findAllWithFilters(filterDto: FilterProductsDto): Promise<{
+    data: Product[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    minPrice?: number;
+    maxPrice?: number;
+  }> {
+    const query = this.productRepo.createQueryBuilder('product');
+
+    // روابط ضروری
+    query
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.specifications', 'specifications')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.values', 'variantValues')
+      .innerJoinAndSelect('product.offers', 'offers')
+      .innerJoinAndSelect('offers.seller', 'seller');
+
+    // فیلتر: جستجو در نام و sku
+    if (filterDto.search) {
+      query.andWhere(
+        '(LOWER(product.name) LIKE LOWER(:search) OR LOWER(product.description) LIKE LOWER(:search))',
+        { search: `%${filterDto.search}%` },
+      );
+    }
+
+    if (filterDto.sku) {
+      query.andWhere('LOWER(product.sku) LIKE LOWER(:sku)', {
+        sku: `%${filterDto.sku}%`,
+      });
+    }
+
+    // فیلتر: دسته‌بندی (شامل تمام دسته‌های فرزند)
+    if (filterDto.categoryId) {
+      const categoryIds = await this.getAllDescendantCategoryIds(
+        filterDto.categoryId,
+      );
+      query.andWhere('product.categoryId IN (:...categoryIds)', {
+        categoryIds,
+      });
+    }
+
+    // فیلتر: تگ‌ها (چندتایی)
+    if (filterDto.tagIds) {
+      const tagIds = filterDto.tagIds
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((id) => !isNaN(id));
+
+      if (tagIds.length > 0) {
+        query.andWhere('tags.id IN (:...tagIds)', { tagIds });
+      }
+    }
+
+    // فیلتر: وضعیت محصول
+    if (filterDto.isActive !== undefined) {
+      query.andWhere('product.isActive = :isActive', {
+        isActive: filterDto.isActive,
+      });
+    }
+
+    // اگر فیلتر قیمت، موجودی، تخفیف یا فروشنده درخواست شده است
+    // باید offers را معمولاً join کنیم
+    const hasOfferFilters =
+      filterDto.minPrice !== undefined ||
+      filterDto.maxPrice !== undefined ||
+      filterDto.inStockOnly ||
+      filterDto.discountedOnly ||
+      filterDto.sellerIds ||
+      filterDto.hasWarrantyOnly;
+
+    if (hasOfferFilters) {
+      // فیلتر: قیمت (بر اساس discountPrice اگر وجود داشت، وگرنه price)
+      if (
+        filterDto.minPrice !== undefined ||
+        filterDto.maxPrice !== undefined
+      ) {
+        const priceQuery =
+          '(CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END)';
+        if (
+          filterDto.minPrice !== undefined &&
+          filterDto.maxPrice !== undefined
+        ) {
+          query.andWhere(`${priceQuery} BETWEEN :minPrice AND :maxPrice`, {
+            minPrice: filterDto.minPrice,
+            maxPrice: filterDto.maxPrice,
+          });
+        } else if (filterDto.minPrice !== undefined) {
+          query.andWhere(`${priceQuery} >= :minPrice`, {
+            minPrice: filterDto.minPrice,
+          });
+        } else if (filterDto.maxPrice !== undefined) {
+          query.andWhere(`${priceQuery} <= :maxPrice`, {
+            maxPrice: filterDto.maxPrice,
+          });
+        }
+      }
+
+      // فیلتر: موجودی
+      if (filterDto.inStockOnly) {
+        query.andWhere('offers.stock > :zeroStock', { zeroStock: 0 });
+      }
+
+      // فیلتر: تخفیف
+      if (filterDto.discountedOnly) {
+        query.andWhere('offers.discountPercent > :zeroDiscount', {
+          zeroDiscount: 0,
+        });
+      }
+
+      // فیلتر: فروشنده (چندتایی)
+      if (filterDto.sellerIds) {
+        const sellerIds = filterDto.sellerIds
+          .split(',')
+          .map((id) => parseInt(id.trim(), 10))
+          .filter((id) => !isNaN(id));
+
+        if (sellerIds.length > 0) {
+          query.andWhere('offers.sellerId IN (:...sellerIds)', { sellerIds });
+        }
+      }
+
+      // فیلتر: گارانتی
+      if (filterDto.hasWarrantyOnly) {
+        query.andWhere('offers.hasWarranty = :hasWarranty', {
+          hasWarranty: true,
+        });
+      }
+    }
+
+    // شمارش کل نتایج قبل از صفحه‌بندی (برای grouping)
+    // اگر offers استفاده شده، باید distinct استفاده کنیم
+    if (hasOfferFilters) {
+      query.distinct(true);
+    }
+
+    const originQuery = query.clone();
+
+    // ترتیب نتایج
+    switch (filterDto.sortBy) {
+      case SortBy.PRICE_LOW:
+        // کارنترین قیمت
+        query.orderBy(
+          'CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END',
+          'ASC',
+        );
+        query.addOrderBy('product.createdAt', 'DESC');
+        break;
+
+      case SortBy.PRICE_HIGH:
+        // گران‌ترین قیمت
+        query.orderBy(
+          'CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END',
+          'DESC',
+        );
+        query.addOrderBy('product.createdAt', 'DESC');
+        break;
+
+      case SortBy.DISCOUNT:
+        // بیشترین تخفیف
+        query.orderBy('offers.discountPercent', 'DESC');
+        query.addOrderBy('product.createdAt', 'DESC');
+        break;
+
+      case SortBy.POPULAR:
+        // پرفروش‌ترین (بر اساس تعداد offers/sellers)
+        query.orderBy('COUNT(offers.id)', 'DESC');
+        query.addOrderBy('product.createdAt', 'DESC');
+        break;
+
+      case SortBy.RATING:
+        // بهترین امتیاز (اگر rating system داشتیم - برای حال کماندو‌های تگ استفاده می‌کنیم)
+        query.orderBy('product.createdAt', 'DESC');
+        break;
+
+      case SortBy.NEWEST:
+      default:
+        query.orderBy('product.createdAt', 'DESC');
+        break;
+    }
+
+    // صفحه‌بندی
+    const page = filterDto.page || 1;
+    const limit = filterDto.limit || 10;
+    const skip = (page - 1) * limit;
+
+    query.skip(skip).take(limit);
+
+    const [products, total] = await query.getManyAndCount();
+    const totalPages = Math.ceil(total / limit);
+
+    // محاسبه بازه قیمت برای اطلاعات بیشتر
+    let minPrice: number | undefined;
+    let maxPrice: number | undefined;
+
+    if (hasOfferFilters || !filterDto.minPrice) {
+      const priceQuery = originQuery
+        .select(
+          'MIN(CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END)',
+          'minPrice',
+        )
+        .addSelect(
+          'MAX(CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END)',
+          'maxPrice',
+        );
+
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+      const priceResult = (await priceQuery.getRawOne()) as Record<
+        string,
+        string | undefined
+      >;
+      minPrice = priceResult?.minPrice
+        ? parseFloat(priceResult.minPrice)
+        : undefined;
+      maxPrice = priceResult?.maxPrice
+        ? parseFloat(priceResult.maxPrice)
+        : undefined;
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+    }
+
+    return {
+      data: products,
+      total,
+      page,
+      limit,
+      totalPages,
+      minPrice,
+      maxPrice,
+    };
+  }
+
+  /**
+   * دریافت تمام محصولات (بدون فیلتر offers) - برای Dashboard فروشندگان
+   */
+  async findAllProducts(
     page: number = 1,
     limit: number = 10,
     search?: string,
     categoryId?: number,
     isActive?: boolean,
+    sortBy?: string,
   ): Promise<{
     data: Product[];
     total: number;
@@ -154,25 +397,25 @@ export class ProductsService {
     const query = this.productRepo.createQueryBuilder('product');
 
     // روابط
-    query.leftJoinAndSelect('product.category', 'category');
-    query.leftJoinAndSelect('product.tags', 'tags');
-    query.leftJoinAndSelect('product.specifications', 'specifications');
-    query.leftJoinAndSelect('product.gallery', 'gallery');
-    query.leftJoinAndSelect('product.variants', 'variants');
-    query.leftJoinAndSelect('variants.values', 'variantValues');
-    query.leftJoinAndSelect('product.offers', 'offers');
-    query.leftJoinAndSelect('offers.seller', 'seller');
-    query.leftJoinAndSelect('offers.variantValues', 'offerVariantValues');
+    query
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.specifications', 'specifications')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.values', 'variantValues')
+      .leftJoinAndSelect('product.offers', 'offers')
+      .leftJoinAndSelect('offers.seller', 'seller');
 
-    // جستجو در نام و کد محصول
+    // فیلتر: جستجو
     if (search) {
-      query.where(
-        '(LOWER(product.name) LIKE LOWER(:search) OR LOWER(product.sku) LIKE LOWER(:search))',
+      query.andWhere(
+        '(LOWER(product.name) LIKE LOWER(:search) OR LOWER(product.description) LIKE LOWER(:search))',
         { search: `%${search}%` },
       );
     }
 
-    // فیلتر بر اساس دسته (شامل تمام دسته‌های فرزند)
+    // فیلتر: دسته‌بندی
     if (categoryId) {
       const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
       query.andWhere('product.categoryId IN (:...categoryIds)', {
@@ -180,15 +423,25 @@ export class ProductsService {
       });
     }
 
-    // فیلتر بر اساس وضعیت
+    // فیلتر: وضعیت
     if (isActive !== undefined) {
       query.andWhere('product.isActive = :isActive', { isActive });
     }
 
-    // ترتیب و صفحه‌بندی
-    query.orderBy('product.createdAt', 'DESC');
-    query.skip((page - 1) * limit);
-    query.take(limit);
+    // ترتیب نتایج
+    if (sortBy === 'price_low') {
+      query.orderBy('MIN(offers.price)', 'ASC');
+    } else if (sortBy === 'price_high') {
+      query.orderBy('MAX(offers.price)', 'DESC');
+    } else if (sortBy === 'popular') {
+      query.orderBy('COUNT(offers.id)', 'DESC');
+    } else {
+      query.orderBy('product.createdAt', 'DESC');
+    }
+
+    // صفحه‌بندی
+    const skip = (page - 1) * limit;
+    query.skip(skip).take(limit);
 
     const [products, total] = await query.getManyAndCount();
     const totalPages = Math.ceil(total / limit);
@@ -403,25 +656,38 @@ export class ProductsService {
    */
   async findByCategory(categoryId: number): Promise<Product[]> {
     const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
-    return await this.productRepo.find({
-      where: {
-        category: { id: In(categoryIds) },
-        isActive: true,
-      },
-      relations: ['category', 'tags', 'gallery', 'variants', 'variants.values'],
-      order: { createdAt: 'DESC' },
-    });
+    return await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.values', 'variantValues')
+      .innerJoinAndSelect('product.offers', 'offers')
+      .innerJoinAndSelect('offers.seller', 'seller')
+      .where('product.categoryId IN (:...categoryIds)', { categoryIds })
+      .andWhere('product.isActive = :isActive', { isActive: true })
+      .orderBy('product.createdAt', 'DESC')
+      .getMany();
   }
 
   /**
    * دریافت محصولات با تگ خاص
    */
   async findByTag(tagId: number): Promise<Product[]> {
-    return await this.productRepo.find({
-      where: { tags: { id: tagId }, isActive: true },
-      relations: ['category', 'tags', 'gallery', 'variants', 'variants.values'],
-      order: { createdAt: 'DESC' },
-    });
+    return await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.values', 'variantValues')
+      .innerJoinAndSelect('product.offers', 'offers')
+      .innerJoinAndSelect('offers.seller', 'seller')
+      .where('tags.id = :tagId', { tagId })
+      .andWhere('product.isActive = :isActive', { isActive: true })
+      .orderBy('product.createdAt', 'DESC')
+      .getMany();
   }
 
   /**

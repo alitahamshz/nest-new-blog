@@ -8,6 +8,7 @@ import { ProductCategory } from 'src/entities/product-category.entity';
 import { ProductVariant } from 'src/entities/product-variant.entity';
 import { ProductImage } from 'src/entities/product-image.entity';
 import { ProductSpecification } from 'src/entities/product-specification.entity';
+import { SellerOffer } from 'src/entities/seller-offer.entity';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ProductSpecification } from 'src/entities/product-specification.entity'
       ProductVariant,
       ProductImage,
       ProductSpecification,
+      SellerOffer,
     ]),
   ],
   controllers: [ProductsController],

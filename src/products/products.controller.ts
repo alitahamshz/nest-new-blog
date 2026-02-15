@@ -21,6 +21,7 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { FilterProductsDto, SortBy } from './dto/filter-products.dto';
 
 @ApiTags('Products')
 @Controller('products')
@@ -46,7 +47,9 @@ export class ProductsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'دریافت لیست تمام محصولات با صفحه‌بندی و جستجو' })
+  @ApiOperation({
+    summary: 'دریافت لیست تمام محصولات با فیلتر‌های پیشرفته و صفحه‌بندی',
+  })
   @ApiQuery({
     name: 'page',
     required: false,
@@ -60,9 +63,9 @@ export class ProductsController {
     example: 10,
   })
   @ApiQuery({
-    name: 'name',
+    name: 'search',
     required: false,
-    description: 'جستجو در نام محصول',
+    description: 'جستجو در نام محصول یا توضیحات',
   })
   @ApiQuery({
     name: 'sku',
@@ -72,13 +75,61 @@ export class ProductsController {
   @ApiQuery({
     name: 'categoryId',
     required: false,
-    description: 'فیلتر بر اساس شناسه دسته',
+    description: 'فیلتر بر اساس شناسه دسته (شامل تمام دسته‌های فرزند)',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'tagIds',
+    required: false,
+    description: 'فیلتر بر اساس تگ‌ها (فرمت: "1,2,3")',
+  })
+  @ApiQuery({
+    name: 'minPrice',
+    required: false,
+    description: 'حداقل قیمت',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'maxPrice',
+    required: false,
+    description: 'حداکثر قیمت',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'sellerIds',
+    required: false,
+    description: 'فیلتر بر اساس فروشنده (فرمت: "1,2,3")',
+  })
+  @ApiQuery({
+    name: 'inStockOnly',
+    required: false,
+    description: 'فقط محصولات موجود در انبار (true/false)',
+    type: Boolean,
+  })
+  @ApiQuery({
+    name: 'discountedOnly',
+    required: false,
+    description: 'فقط محصولات با تخفیف (true/false)',
+    type: Boolean,
+  })
+  @ApiQuery({
+    name: 'hasWarrantyOnly',
+    required: false,
+    description: 'فقط محصولات دارای گارانتی (true/false)',
+    type: Boolean,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description:
+      'ترتیب نتایج: newest|price_low|price_high|popular|rating|discount',
+    enum: SortBy,
   })
   @ApiQuery({
     name: 'isActive',
     required: false,
     description: 'فیلتر بر اساس وضعیت فعال (true/false)',
-    example: 'true',
+    type: Boolean,
   })
   @ApiResponse({
     status: 200,
@@ -87,22 +138,122 @@ export class ProductsController {
   async findAll(
     @Query('page', new ParseIntPipe({ optional: true })) page?: number,
     @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-    @Query('name') name?: string,
+    @Query('search') search?: string,
     @Query('sku') sku?: string,
     @Query('categoryId', new ParseIntPipe({ optional: true }))
     categoryId?: number,
+    @Query('tagIds') tagIds?: string,
+    @Query('minPrice', new ParseIntPipe({ optional: true }))
+    minPrice?: number,
+    @Query('maxPrice', new ParseIntPipe({ optional: true }))
+    maxPrice?: number,
+    @Query('sellerIds') sellerIds?: string,
+    @Query('inStockOnly') inStockOnly?: string,
+    @Query('discountedOnly') discountedOnly?: string,
+    @Query('hasWarrantyOnly') hasWarrantyOnly?: string,
+    @Query('sortBy') sortBy?: SortBy,
+    @Query('minRating', new ParseIntPipe({ optional: true }))
+    minRating?: number,
     @Query('isActive') isActive?: string,
   ) {
-    // ترکیب name و sku برای جستجو
-    const search = name || sku;
+    const filterDto: FilterProductsDto = {
+      page: page || 1,
+      limit: limit || 10,
+      search: search || undefined,
+      sku: sku || undefined,
+      categoryId,
+      tagIds,
+      minPrice,
+      maxPrice,
+      sellerIds,
+      inStockOnly:
+        inStockOnly === 'true'
+          ? true
+          : inStockOnly === 'false'
+            ? false
+            : undefined,
+      discountedOnly:
+        discountedOnly === 'true'
+          ? true
+          : discountedOnly === 'false'
+            ? false
+            : undefined,
+      hasWarrantyOnly:
+        hasWarrantyOnly === 'true'
+          ? true
+          : hasWarrantyOnly === 'false'
+            ? false
+            : undefined,
+      sortBy: sortBy || SortBy.NEWEST,
+      minRating,
+      isActive: isActive === 'false' ? false : true,
+    };
+
+    return this.productsService.findAllWithFilters(filterDto);
+  }
+
+  @Get('all')
+  @ApiOperation({
+    summary:
+      'دریافت تمام محصولات (بدون فیلتر offers) - برای Dashboard فروشندگان',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'شماره صفحه (پیش‌فرض: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'تعداد اقلام در هر صفحه (پیش‌فرض: 10)',
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'جستجو در نام محصول',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'فیلتر بر اساس دسته‌بندی',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    description: 'ترتیب: newest|price_low|price_high|popular',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    description: 'فیلتر وضعیت (true/false)',
+    type: Boolean,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'تمام محصولات (شامل آنهایی بدون offer)',
+  })
+  async findAllUnfiltered(
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('search') search?: string,
+    @Query('categoryId', new ParseIntPipe({ optional: true }))
+    categoryId?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('isActive') isActive?: string,
+  ) {
     const isActiveBoolean =
       isActive === 'true' ? true : isActive === 'false' ? false : undefined;
-    return await this.productsService.findAll(
+
+    return this.productsService.findAllProducts(
       page || 1,
       limit || 10,
       search,
       categoryId,
       isActiveBoolean,
+      sortBy,
     );
   }
 
