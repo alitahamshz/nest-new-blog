@@ -46,6 +46,131 @@ export class ProductsController {
     return await this.productsService.create(createProductDto);
   }
 
+  @Get('search')
+  @ApiOperation({
+    summary:
+      'جستجوی محصول و دسته‌بندی - صفحه‌بندی فقط برای محصولات، دسته‌بندی‌ها بدون صفحه‌بندی',
+    description:
+      'جستجو بر اساس کلیدواژه در نام محصول و دسته‌بندی. نتایج محصولات فقط شامل محصولاتی هستند که حداقل یک آفر فروشنده دارند. محصولات صفحه‌بندی شده‌اند اما دسته‌بندی‌ها همه نتایج را بدون صفحه‌بندی برمی‌گردانند.',
+  })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'متن جستجو (نام محصول یا دسته‌بندی)',
+    example: 'گوشی',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'شماره صفحه برای محصولات فقط (پیش‌فرض: 1)',
+    example: 1,
+    type: 'integer',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'تعداد نتایج محصولات در هر صفحه (پیش‌فرض: 20)',
+    example: 20,
+    type: 'integer',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'نتایج جستجو - محصولات دارای صفحه‌بندی و دسته‌بندی‌ها بدون صفحه‌بندی',
+    schema: {
+      example: {
+        products: {
+          data: [
+            {
+              id: 1,
+              name: 'گوشی هوشمند نوکیا',
+              slug: 'nokia-smartphone',
+              mainImage: 'https://...',
+              description: 'توضیحات...',
+              sku: 'NOKIA-001',
+              categoryPath: [
+                {
+                  id: 1,
+                  name: 'الکترونیک',
+                  slug: 'electronics',
+                  icon: null,
+                },
+                {
+                  id: 2,
+                  name: 'تلفن همراه',
+                  slug: 'mobile',
+                  icon: null,
+                },
+              ],
+              offerCount: 3,
+              minPrice: 5000000,
+              maxPrice: 7500000,
+            },
+          ],
+          total: 15,
+          page: 1,
+          limit: 20,
+        },
+        categories: {
+          data: [
+            {
+              id: 2,
+              name: 'تلفن همراه',
+              slug: 'mobile',
+              icon: null,
+              categoryPath: [
+                {
+                  id: 1,
+                  name: 'الکترونیک',
+                  slug: 'electronics',
+                  icon: null,
+                },
+                {
+                  id: 2,
+                  name: 'تلفن همراه',
+                  slug: 'mobile',
+                  icon: null,
+                },
+              ],
+              productCount: 245,
+            },
+          ],
+          total: 1,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'کلیدواژه‌ی جستجو خالی است',
+  })
+  async search(
+    @Query('q') query?: string,
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!query || query.trim().length === 0) {
+      return {
+        products: {
+          data: [],
+          total: 0,
+          page: page || 1,
+          limit: limit || 20,
+        },
+        categories: {
+          data: [],
+          total: 0,
+        },
+      };
+    }
+
+    return await this.productsService.searchCombined(
+      query.trim(),
+      page || 1,
+      limit || 20,
+    );
+  }
+
   @Get()
   @ApiOperation({
     summary: 'دریافت لیست تمام محصولات با فیلتر‌های پیشرفته و صفحه‌بندی',

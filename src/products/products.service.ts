@@ -352,7 +352,6 @@ export class ProductsService {
           'maxPrice',
         );
 
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
       const priceResult = (await priceQuery.getRawOne()) as Record<
         string,
         string | undefined
@@ -363,7 +362,6 @@ export class ProductsService {
       maxPrice = priceResult?.maxPrice
         ? parseFloat(priceResult.maxPrice)
         : undefined;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
     }
 
     return {
@@ -688,6 +686,169 @@ export class ProductsService {
       .andWhere('product.isActive = :isActive', { isActive: true })
       .orderBy('product.createdAt', 'DESC')
       .getMany();
+  }
+
+  /**
+   * دریافت مسیر کامل دسته‌بندی از ریشه تا فرزند
+   */
+  async getCategoryPath(categoryId: number): Promise<any[]> {
+    const path: any[] = [];
+    let currentCategory = await this.categoryRepo.findOne({
+      where: { id: categoryId },
+      relations: ['parent'],
+    });
+
+    while (currentCategory) {
+      path.unshift({
+        id: currentCategory.id,
+        name: currentCategory.name,
+        slug: currentCategory.slug,
+        icon: currentCategory.icon || null,
+      });
+      if (currentCategory.parent) {
+        currentCategory = await this.categoryRepo.findOne({
+          where: { id: currentCategory.parent.id },
+          relations: ['parent'],
+        });
+      } else {
+        currentCategory = null;
+      }
+    }
+
+    return path;
+  }
+
+  /**
+   * جستجوی محصول بر اساس نام
+   * فقط محصولاتی را برمی‌گرداند که حداقل یک آفر فروشنده دارند
+   */
+  async searchProducts(query: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+
+    // جستجو تنها بر اساس نام محصول
+    const [products, total] = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.tags', 'tags')
+      .leftJoinAndSelect('product.gallery', 'gallery')
+      .innerJoinAndSelect('product.offers', 'offers')
+      .innerJoinAndSelect('offers.seller', 'seller')
+      .where('LOWER(product.name) LIKE LOWER(:query)', { query: `%${query}%` })
+      .andWhere('product.isActive = :isActive', { isActive: true })
+      .orderBy('product.createdAt', 'DESC')
+      .distinct(true)
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    // تحویل نتایج با مسیر کامل دسته‌بندی
+    const resultsWithCategoryPath = await Promise.all(
+      products.map(async (product) => {
+        const categoryPath = await this.getCategoryPath(product.category.id);
+
+        // محاسبه حداقل و حداکثر قیمت از آفرها
+        const prices = product.offers.map((offer) =>
+          offer.discountPrice && offer.discountPrice > 0
+            ? offer.discountPrice
+            : offer.price,
+        );
+
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          mainImage: product.mainImage,
+          description: product.description,
+          sku: product.sku,
+          categoryPath,
+          offerCount: product.offers.length,
+          minPrice: prices.length > 0 ? Math.min(...prices) : undefined,
+          maxPrice: prices.length > 0 ? Math.max(...prices) : undefined,
+        };
+      }),
+    );
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: resultsWithCategoryPath,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  /**
+   * جستجوی دسته‌بندی بر اساس نام
+   */
+  async searchCategories(query: string) {
+    const categories = await this.categoryRepo
+      .createQueryBuilder('category')
+      .where('LOWER(category.name) LIKE LOWER(:query)', { query: `%${query}%` })
+      .orderBy('category.name', 'ASC')
+      .getMany();
+
+    return categories;
+  }
+
+  /**
+   * دریافت تعداد محصولات در یک دسته (شامل تمام فرزندان آن)
+   */
+  async getProductCountInCategory(categoryId: number): Promise<number> {
+    const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
+    const count = await this.productRepo.count({
+      where: {
+        category: {
+          id: In(categoryIds),
+        },
+        isActive: true,
+      },
+    });
+    return count;
+  }
+
+  /**
+   * جستجوی ترکیبی محصول و دسته‌بندی
+   * صفحه‌بندی فقط برای محصولات است
+   * دسته‌بندی‌ها بدون صفحه‌بندی برگردانده می‌شوند
+   */
+  async searchCombined(query: string, page: number = 1, limit: number = 20) {
+    // جستجو در محصولات (با صفحه‌بندی)
+    const productsResult = await this.searchProducts(query, page, limit);
+
+    // جستجو در دسته‌بندی‌ها (بدون صفحه‌بندی - همه نتایج)
+    const searchedCategories = await this.searchCategories(query);
+
+    // افزودن مسیر کامل برای هر دسته و تعداد محصولات
+    const categoriesWithPath = await Promise.all(
+      searchedCategories.map(async (category) => {
+        const categoryPath = await this.getCategoryPath(category.id);
+        const productCount = await this.getProductCountInCategory(category.id);
+
+        return {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          icon: category.icon || null,
+          categoryPath,
+          productCount,
+        };
+      }),
+    );
+
+    return {
+      products: {
+        data: productsResult.data,
+        total: productsResult.total,
+        page: productsResult.page,
+        limit: productsResult.limit,
+      },
+      categories: {
+        data: categoriesWithPath,
+        total: categoriesWithPath.length,
+      },
+    };
   }
 
   /**
