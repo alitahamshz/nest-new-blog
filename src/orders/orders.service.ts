@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
@@ -420,15 +419,21 @@ export class OrdersService {
   }
 
   /**
-   * دریافت سفارشات یک کاربر (با pagination)
+   * دریافت سفارشات یک کاربر (با pagination و فیلتر وضعیت)
    */
   async findByUser(
     userId: number,
     page: number = 1,
     limit: number = 10,
+    status?: OrderStatus,
   ): Promise<{ data: Order[]; total: number; page: number; pages: number }> {
+    const where: Record<string, unknown> = { user: { id: userId } };
+    if (status) {
+      where.status = status;
+    }
+
     const [orders, total] = await this.orderRepo.findAndCount({
-      where: { user: { id: userId } },
+      where,
       relations: ['items', 'items.product', 'items.seller'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
@@ -444,14 +449,57 @@ export class OrdersService {
   }
 
   /**
-   * دریافت سفارشات یک فروشنده
+   * دریافت سفارشات یک فروشنده (با pagination و فیلتر وضعیت)
+   * هر ردیف = یک سفارش کامل، با آیتم‌های فیلترشده برای این فروشنده
    */
-  async findBySeller(sellerId: number): Promise<OrderItem[]> {
-    return await this.orderItemRepo.find({
-      where: { seller: { id: sellerId } },
-      relations: ['order', 'product', 'variant'],
-      order: { createdAt: 'DESC' },
-    });
+  async findBySeller(
+    sellerId: number,
+    page: number = 1,
+    limit: number = 10,
+    status?: OrderStatus,
+  ): Promise<{
+    data: Order[];
+    total: number;
+    page: number;
+    pages: number;
+  }> {
+    const qb = this.orderRepo
+      .createQueryBuilder('order')
+      // فقط سفارش‌هایی که حداقل یک آیتم از این فروشنده دارند
+      .innerJoin(
+        'order.items',
+        'filterItem',
+        'filterItem.sellerId = :sellerId',
+        { sellerId },
+      )
+      // اطلاعات خریدار
+      .leftJoinAndSelect('order.user', 'user')
+      // فقط آیتم‌های همین فروشنده رو load کن
+      .innerJoinAndSelect(
+        'order.items',
+        'items',
+        'items.sellerId = :sellerId',
+        { sellerId },
+      )
+      .leftJoinAndSelect('items.product', 'product')
+      .orderBy('order.createdAt', 'DESC');
+
+    if (status) {
+      qb.andWhere('order.status = :status', { status });
+    }
+
+    const total = await qb.getCount();
+    const orders = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return {
+      data: orders,
+      total,
+      page,
+      pages: Math.ceil(total / limit),
+    };
   }
 
   /**
@@ -687,7 +735,7 @@ export class OrdersService {
    * حذف خودکار سفارشات Unpaid بعد 15 دقیقه (Cron Job)
    * هر 5 دقیقه یکبار اجرا می‌شود
    */
-  @Cron('*/5 * * * *')
+  @Cron('*/30 * * * *')
   async handleUnpaidOrdersExpiry() {
     try {
       this.logger.debug('شروع Cron: حذف سفارشات منقضی‌شده');

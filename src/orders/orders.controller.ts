@@ -63,18 +63,9 @@ export class OrdersController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'دریافت سفارشات یک کاربر' })
   @ApiParam({ name: 'userId', description: 'شناسه کاربر' })
-  @ApiQuery({
-    name: 'page',
-    description: 'شماره صفحه',
-    required: false,
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    description: 'تعداد آیتم‌ها در صفحه',
-    required: false,
-    example: 10,
-  })
+  @ApiQuery({ name: 'page', description: 'شماره صفحه', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', description: 'تعداد آیتم‌ها در صفحه', required: false, example: 10 })
+  @ApiQuery({ name: 'status', description: 'فیلتر وضعیت سفارش', required: false, enum: OrderStatus })
   @ApiResponse({
     status: 200,
     description: 'لیست سفارشات کاربر',
@@ -83,23 +74,44 @@ export class OrdersController {
     @Param('userId', ParseIntPipe) userId: number,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('status') status?: OrderStatus,
     @CurrentUser() user?: User,
   ) {
     if (user?.id !== userId) {
       throw new ForbiddenException('شما دسترسی به سفارشات دیگران را ندارید');
     }
-    return await this.ordersService.findByUser(userId, page || 1, limit || 10);
+    return await this.ordersService.findByUser(
+      userId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      status,
+    );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('seller/:sellerId')
   @ApiOperation({ summary: 'دریافت سفارشات یک فروشنده' })
   @ApiParam({ name: 'sellerId', description: 'شناسه فروشنده' })
+  @ApiQuery({ name: 'page', description: 'شماره صفحه', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', description: 'تعداد آیتم‌ها در صفحه', required: false, example: 10 })
+  @ApiQuery({ name: 'status', description: 'فیلتر وضعیت سفارش', required: false, enum: OrderStatus })
   @ApiResponse({
     status: 200,
     description: 'لیست سفارشات فروشنده',
   })
-  async findBySeller(@Param('sellerId', ParseIntPipe) sellerId: number) {
-    return await this.ordersService.findBySeller(sellerId);
+  async findBySeller(
+    @Param('sellerId', ParseIntPipe) sellerId: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('status') status?: OrderStatus,
+  ) {
+    return await this.ordersService.findBySeller(
+      sellerId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+      status,
+    );
   }
 
   @Get('number/:orderNumber')
