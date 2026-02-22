@@ -114,6 +114,34 @@ export class OrdersController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('user/:userId/status-counts')
+  @ApiOperation({ summary: 'تعداد سفارشات کاربر به تفکیک وضعیت' })
+  @ApiParam({ name: 'userId', description: 'شناسه کاربر' })
+  @ApiResponse({ status: 200, description: 'آبجکت وضعیت → تعداد' })
+  async getUserStatusCounts(
+    @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: User,
+  ) {
+    if (user?.id !== userId) {
+      throw new ForbiddenException('شما دسترسی به سفارشات دیگران را ندارید');
+    }
+    return await this.ordersService.getUserStatusCounts(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('seller/:sellerId/status-counts')
+  @ApiOperation({ summary: 'تعداد سفارشات فروشنده به تفکیک وضعیت' })
+  @ApiParam({ name: 'sellerId', description: 'شناسه فروشنده' })
+  @ApiResponse({ status: 200, description: 'آبجکت وضعیت → تعداد' })
+  async getSellerStatusCounts(
+    @Param('sellerId', ParseIntPipe) sellerId: number,
+  ) {
+    return await this.ordersService.getSellerStatusCounts(sellerId);
+  }
+
   @Get('number/:orderNumber')
   @ApiOperation({ summary: 'دریافت سفارش با شماره سفارش' })
   @ApiParam({ name: 'orderNumber', description: 'شماره سفارش' })
@@ -262,7 +290,7 @@ export class OrdersController {
   @ApiQuery({
     name: 'transactionId',
     description: 'شماره تراکنش',
-    required: true,
+    required: false,
   })
   @ApiResponse({
     status: 200,
@@ -271,8 +299,83 @@ export class OrdersController {
   async confirmPayment(
     @Param('id', ParseIntPipe) id: number,
     @Query('transactionId') transactionId: string,
+    @Body() body: UpdateOrderDto,
     @CurrentUser() user: User,
   ) {
-    return await this.ordersService.confirmPayment(id, transactionId, user);
+    const txId = transactionId || body?.transactionId || `FAKE-${id}-${Date.now()}`;
+    return await this.ordersService.confirmPayment(id, txId, user);
+  }
+
+  // ─────────────────────────────── عملیات فروشنده ─────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/seller/confirm')
+  @ApiOperation({ summary: 'تأیید سفارش پرداخت‌شده توسط فروشنده → در حال پردازش' })
+  async sellerConfirmOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    const sellerId = user.seller?.id;
+    if (!sellerId) throw new ForbiddenException('شما فروشنده نیستید');
+    return await this.ordersService.sellerConfirmOrder(id, sellerId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/seller/reject')
+  @ApiOperation({ summary: 'رد سفارش پرداخت‌شده توسط فروشنده → لغو شده' })
+  async sellerRejectOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('reason') reason: string,
+    @Body() body: UpdateOrderDto,
+    @CurrentUser() user: User,
+  ) {
+    const sellerId = user.seller?.id;
+    if (!sellerId) throw new ForbiddenException('شما فروشنده نیستید');
+    const cancelReason = reason || body?.cancelReason || 'رد توسط فروشنده';
+    return await this.ordersService.sellerRejectOrder(id, sellerId, cancelReason);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/seller/ship')
+  @ApiOperation({ summary: 'علامت‌گذاری سفارش به عنوان ارسال شده → ارسال شده' })
+  async sellerShipOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('trackingNumber') trackingNumber: string,
+    @Query('carrier') carrier: string,
+    @Body() body: UpdateOrderDto,
+    @CurrentUser() user: User,
+  ) {
+    const sellerId = user.seller?.id;
+    if (!sellerId) throw new ForbiddenException('شما فروشنده نیستید');
+    const tn = trackingNumber || body?.trackingNumber;
+    const cr = carrier || body?.carrier;
+    return await this.ordersService.sellerShipOrder(id, sellerId, tn, cr);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/buyer/confirm-delivery')
+  @ApiOperation({ summary: 'تأیید دریافت سفارش توسط خریدار → تحویل داده شده' })
+  async buyerConfirmDelivery(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    return await this.ordersService.buyerConfirmDelivery(id, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Patch(':id/seller/confirm-delivery')
+  @ApiOperation({ summary: 'تأیید تحویل سفارش توسط فروشنده → تحویل داده شده' })
+  async sellerConfirmDelivery(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ) {
+    const sellerId = user.seller?.id;
+    if (!sellerId) throw new ForbiddenException('شما فروشنده نیستید');
+    return await this.ordersService.sellerConfirmDelivery(id, sellerId);
   }
 }

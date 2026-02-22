@@ -55,4 +55,14 @@ export class UpdateOrderDto {
   @IsOptional()
   @IsString({ message: 'یادداشت کاربر باید متن باشد' })
   customerNote?: string;
+
+  @ApiPropertyOptional({ description: 'شناسه تراکنش پرداخت' })
+  @IsOptional()
+  @IsString()
+  transactionId?: string;
+
+  @ApiPropertyOptional({ description: 'دلیل لغو سفارش' })
+  @IsOptional()
+  @IsString()
+  cancelReason?: string;
 }

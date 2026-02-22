@@ -503,6 +503,42 @@ export class OrdersService {
   }
 
   /**
+   * تعداد سفارشات کاربر به تفکیک وضعیت — یک query با GROUP BY
+   */
+  async getUserStatusCounts(userId: number): Promise<Record<string, number>> {
+    const rows = await this.orderRepo
+      .createQueryBuilder('order')
+      .select('order.status', 'status')
+      .addSelect('COUNT(*)', 'count')
+      .where('order.userId = :userId', { userId })
+      .groupBy('order.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    return rows.reduce<Record<string, number>>(
+      (acc, r) => ({ ...acc, [r.status]: Number(r.count) }),
+      {},
+    );
+  }
+
+  /**
+   * تعداد سفارشات فروشنده به تفکیک وضعیت — یک query با GROUP BY
+   */
+  async getSellerStatusCounts(sellerId: number): Promise<Record<string, number>> {
+    const rows = await this.orderRepo
+      .createQueryBuilder('order')
+      .innerJoin('order.items', 'item', 'item.sellerId = :sellerId', { sellerId })
+      .select('order.status', 'status')
+      .addSelect('COUNT(DISTINCT order.id)', 'count')
+      .groupBy('order.status')
+      .getRawMany<{ status: string; count: string }>();
+
+    return rows.reduce<Record<string, number>>(
+      (acc, r) => ({ ...acc, [r.status]: Number(r.count) }),
+      {},
+    );
+  }
+
+  /**
    * دریافت یک سفارش با شماره سفارش
    */
   async findByOrderNumber(orderNumber: string): Promise<Order> {
@@ -512,8 +548,8 @@ export class OrdersService {
         'user',
         'items',
         'items.product',
-        'items.variant',
         'items.seller',
+        'items.offer',
       ],
     });
 
@@ -534,8 +570,8 @@ export class OrdersService {
         'user',
         'items',
         'items.product',
-        'items.variant',
         'items.seller',
+        'items.offer',
       ],
     });
 
@@ -686,6 +722,146 @@ export class OrdersService {
     order.paidAt = new Date();
     order.status = OrderStatus.PAID;
 
+    return await this.orderRepo.save(order);
+  }
+
+  // ─────────────────────────────── عملیات فروشنده ───────────────────────────
+
+  /**
+   * تأیید سفارش پرداخت‌شده توسط فروشنده
+   * PAID → PROCESSING
+   */
+  async sellerConfirmOrder(id: number, sellerId: number): Promise<Order> {
+    const order = await this.findOne(id);
+
+    const belongs = order.items.some((item) => item.seller?.id === sellerId);
+    if (!belongs) {
+      throw new ForbiddenException('این سفارش متعلق به شما نیست');
+    }
+
+    if (order.status !== OrderStatus.PAID) {
+      throw new BadRequestException(
+        'فقط سفارش‌های پرداخت‌شده قابل تأیید هستند',
+      );
+    }
+
+    order.status = OrderStatus.PROCESSING;
+    return await this.orderRepo.save(order);
+  }
+
+  /**
+   * رد سفارش پرداخت‌شده توسط فروشنده
+   * PAID → CANCELLED + برگرداندن موجودی
+   */
+  async sellerRejectOrder(
+    id: number,
+    sellerId: number,
+    reason?: string,
+  ): Promise<Order> {
+    const order = await this.findOne(id);
+
+    const belongs = order.items.some((item) => item.seller?.id === sellerId);
+    if (!belongs) {
+      throw new ForbiddenException('این سفارش متعلق به شما نیست');
+    }
+
+    if (order.status !== OrderStatus.PAID) {
+      throw new BadRequestException(
+        'فقط سفارش‌های پرداخت‌شده قابل رد هستند',
+      );
+    }
+
+    // بازگرداندن موجودی
+    for (const item of order.items) {
+      if (item.seller?.id === sellerId) {
+        const offer = await this.offerRepo.findOne({
+          where: { id: item.offer.id },
+        });
+        if (offer) {
+          offer.stock += item.quantity;
+          await this.offerRepo.save(offer);
+        }
+      }
+    }
+
+    order.status = OrderStatus.CANCELLED;
+    order.cancelReason = reason || 'رد توسط فروشنده';
+    return await this.orderRepo.save(order);
+  }
+
+  /**
+   * علامت‌گذاری سفارش به عنوان «ارسال شده» توسط فروشنده
+   * PROCESSING → SHIPPED
+   */
+  async sellerShipOrder(
+    id: number,
+    sellerId: number,
+    trackingNumber?: string,
+    carrier?: string,
+  ): Promise<Order> {
+    const order = await this.findOne(id);
+
+    const belongs = order.items.some((item) => item.seller?.id === sellerId);
+    if (!belongs) {
+      throw new ForbiddenException('این سفارش متعلق به شما نیست');
+    }
+
+    if (order.status !== OrderStatus.PROCESSING) {
+      throw new BadRequestException(
+        'فقط سفارش‌های در حال پردازش قابل ارسال هستند',
+      );
+    }
+
+    order.status = OrderStatus.SHIPPED;
+    order.shippedAt = new Date();
+    if (trackingNumber) order.trackingNumber = trackingNumber;
+    if (carrier) order.carrier = carrier;
+
+    return await this.orderRepo.save(order);
+  }
+
+  /**
+   * تأیید دریافت توسط خریدار
+   * SHIPPED → DELIVERED
+   */
+  async buyerConfirmDelivery(id: number, userId: number): Promise<Order> {
+    const order = await this.findOne(id);
+
+    if (order.user.id !== userId) {
+      throw new ForbiddenException('این سفارش متعلق به شما نیست');
+    }
+
+    if (order.status !== OrderStatus.SHIPPED) {
+      throw new BadRequestException(
+        'فقط سفارش‌های ارسال‌شده قابل تأیید تحویل هستند',
+      );
+    }
+
+    order.status = OrderStatus.DELIVERED;
+    order.deliveredAt = new Date();
+    return await this.orderRepo.save(order);
+  }
+
+  /**
+   * تأیید تحویل توسط فروشنده
+   * SHIPPED → DELIVERED
+   */
+  async sellerConfirmDelivery(id: number, sellerId: number): Promise<Order> {
+    const order = await this.findOne(id);
+
+    const belongs = order.items.some((item) => item.seller?.id === sellerId);
+    if (!belongs) {
+      throw new ForbiddenException('این سفارش متعلق به شما نیست');
+    }
+
+    if (order.status !== OrderStatus.SHIPPED) {
+      throw new BadRequestException(
+        'فقط سفارش‌های ارسال‌شده قابل تأیید تحویل هستند',
+      );
+    }
+
+    order.status = OrderStatus.DELIVERED;
+    order.deliveredAt = new Date();
     return await this.orderRepo.save(order);
   }
 

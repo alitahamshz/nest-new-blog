@@ -8,6 +8,7 @@ import {
   Redirect,
   UseGuards,
   ForbiddenException,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,6 +18,7 @@ import {
   ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { PaymentService } from './payment.service';
 import { OrdersService } from '../orders/orders.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -72,55 +74,44 @@ export class PaymentController {
    */
   @Get('verify')
   @ApiOperation({ summary: 'تایید پرداخت (Callback از درگاه)' })
-  @ApiQuery({
-    name: 'orderId',
-    description: 'شناسه سفارش',
-    required: true,
-  })
-  @ApiQuery({
-    name: 'authority',
-    description: 'کد تراکنش',
-    required: true,
-  })
-  @ApiQuery({
-    name: 'status',
-    description: 'وضعیت پرداخت (OK or NOOK)',
-    required: true,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'پرداخت تایید شد',
-  })
+  @ApiQuery({ name: 'orderId', description: 'شناسه سفارش', required: true })
+  @ApiQuery({ name: 'authority', description: 'کد تراکنش', required: true })
+  @ApiQuery({ name: 'status', description: 'وضعیت پرداخت (OK or NOOK)', required: true })
+  @ApiResponse({ status: 302, description: 'ریدایرکت به صفحه نتیجه پرداخت' })
   async verifyPayment(
     @Query('orderId', ParseIntPipe) orderId: number,
     @Query('authority') authority: string,
     @Query('status') status: string,
+    @Res() res: Response,
   ) {
-    const result = await this.paymentService.verifyPayment(
-      orderId,
-      authority,
-      status,
-    );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const resultBase = `${frontendUrl}/shop/payment/result`;
 
-    if (result.success) {
-      // به‌روزرسانی وضعیت سفارش
-      await this.ordersService.confirmPayment(
+    try {
+      const result = await this.paymentService.verifyPayment(
         orderId,
-        result.transactionId || result.refId || `success-${Date.now()}`,
+        authority,
+        status,
       );
-      return {
-        success: true,
-        message: result.message,
-        orderId,
-        refId: result.refId,
-      };
-    }
 
-    return {
-      success: false,
-      message: result.message,
-      orderId,
-    };
+      if (result.success) {
+        await this.ordersService.confirmPayment(
+          orderId,
+          result.transactionId || result.refId || `success-${Date.now()}`,
+        );
+        return res.redirect(
+          `${resultBase}?success=1&orderId=${orderId}&refId=${result.refId || ''}`,
+        );
+      }
+
+      return res.redirect(
+        `${resultBase}?success=0&orderId=${orderId}&message=${encodeURIComponent(result.message)}`,
+      );
+    } catch {
+      return res.redirect(
+        `${resultBase}?success=0&orderId=${orderId}&message=${encodeURIComponent('خطای سرور در پردازش پرداخت')}`,
+      );
+    }
   }
 
   /**

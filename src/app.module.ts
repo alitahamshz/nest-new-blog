@@ -28,18 +28,18 @@ import { PaymentModule } from './payments/payment.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true, // همه‌جا در دسترس باشه
+      isGlobal: true,
     }),
-    ScheduleModule.forRoot(), // Cron Jobs فعال کن
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST,
       port: Number(process.env.DB_PORT),
-      username: process.env.DB_USER, // یوزرنیم دیتابیس
-      password: process.env.DB_PASS, // پسورد دیتابیس
-      database: process.env.DB_NAME, // اسم دیتابیس
-      autoLoadEntities: true, // همه‌ی Entity ها رو خودکار لود میکنه
-      synchronize: false, // فقط در محیط توسعه فعال باشه
+      username: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
+      autoLoadEntities: true,
+      synchronize: true,
     }),
     PostsModule,
     CategoryModule,

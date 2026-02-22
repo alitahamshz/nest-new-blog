@@ -62,7 +62,7 @@ export class PaymentService {
 
       // 🔴 در محیط توسعه: Mock درگاه
       if (process.env.NODE_ENV === 'development') {
-        return this.mockInitiatePayment(order);
+        return await this.mockInitiatePayment(order);
       }
 
       const response = await fetch(this.ZARINPAL_INITIATE_URL, {
@@ -97,7 +97,7 @@ export class PaymentService {
     }
   }
 
-  /**
+  /**c
    * تایید پرداخت (Verification)
    */
   async verifyPayment(
@@ -207,12 +207,25 @@ export class PaymentService {
 
   /**
    * Mock - برای محیط توسعه
+   * paymentUrl به صفحه‌ی بانک فیک در فرانت اشاره می‌کند
    */
-  private mockInitiatePayment(order: Order): PaymentInitiateResponse {
+  private async mockInitiatePayment(order: Order): Promise<PaymentInitiateResponse> {
     const mockAuthority = `mock-${Date.now()}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+
+    // ثبت درخواست پرداخت در تاریخچه
+    await this.paymentLogRepo.save({
+      order,
+      orderId: order.id,
+      status: PaymentStatus.PENDING,
+      amount: order.total,
+      gateway: 'mock',
+      referenceCode: mockAuthority,
+    });
+
     return {
       authority: mockAuthority,
-      paymentUrl: `http://localhost:3000/dev/mock-payment?authority=${mockAuthority}&orderId=${order.id}`,
+      paymentUrl: `${frontendUrl}/shop/payment/gateway?authority=${mockAuthority}&orderId=${order.id}&amount=${order.total}`,
     };
   }
 
