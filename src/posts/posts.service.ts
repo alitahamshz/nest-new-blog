@@ -332,7 +332,7 @@ export class PostsService {
   async findBySlug(slug: string) {
     const post = await this.postRepo.findOne({
       where: { slug },
-      relations: ['category'],
+      relations: ['category', 'author', 'tags', 'products', 'products.offers'],
     });
     if (!post) throw new NotFoundException('Post not found');
     // افزایش بازدید

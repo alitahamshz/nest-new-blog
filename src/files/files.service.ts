@@ -130,10 +130,18 @@ export class FilesService {
         'File delete error:',
         err instanceof Error ? err.message : String(err),
       );
-      // You might not want to throw an error here, just log it.
     }
 
     await this.fileRepository.delete(id);
     return { message: 'File deleted successfully' };
+  }
+
+  async removeByUrl(url: string): Promise<{ message: 'File deleted successfully' }> {
+    const file = await this.fileRepository.findOneBy({ url });
+    if (!file) {
+      // فایل در دیتابیس نیست — با خیال راحت ignore کن
+      return { message: 'File deleted successfully' };
+    }
+    return this.remove(file.id);
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Post } from 'src/entities/post.entity';
 import { User } from 'src/entities/user.entity';
+import { Product } from 'src/entities/product.entity';
 
 export enum CommentStatus {
   PENDING = 'pending',
@@ -30,13 +31,25 @@ export class Comment {
     default: CommentStatus.PENDING,
   })
   status: CommentStatus;
+
+  /** امتیاز (۱ تا ۵) — اختیاری */
+  @Column({ type: 'smallint', nullable: true, default: null })
+  rating: number | null;
+
   // کاربری که کامنت گذاشته
   @ManyToOne(() => User, (user) => user.comments, { onDelete: 'CASCADE' })
   author: User;
 
-  // پست مربوطه
-  @ManyToOne(() => Post, (post) => post.comments, { onDelete: 'CASCADE' })
-  post: Post;
+  // پست مربوطه (nullable برای کامنت محصول)
+  @ManyToOne(() => Post, (post) => post.comments, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  post: Post | null;
+
+  // محصول مربوطه (nullable برای کامنت پست)
+  @ManyToOne(() => Product, { onDelete: 'CASCADE', nullable: true })
+  product: Product | null;
 
   // برای پاسخ‌ها (self relation)
   @ManyToOne(() => Comment, (comment) => comment.children, {

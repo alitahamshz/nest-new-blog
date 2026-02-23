@@ -24,6 +24,8 @@ import { ProductSpecificationModule } from './product-specification/product-spec
 import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentModule } from './payments/payment.module';
+import { BannersModule } from './banners/banners.module';
+import { PromoBannersModule } from './promo-banners/promo-banners.module';
 
 @Module({
   imports: [
@@ -61,6 +63,8 @@ import { PaymentModule } from './payments/payment.module';
     CartModule,
     OrdersModule,
     PaymentModule,
+    BannersModule,
+    PromoBannersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

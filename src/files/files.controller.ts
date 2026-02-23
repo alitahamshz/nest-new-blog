@@ -69,6 +69,7 @@ import {
   Get,
   Delete,
   Param,
+  Body,
   UploadedFile,
   UseInterceptors,
   UseGuards,
@@ -129,6 +130,14 @@ export class FilesController {
   @Get()
   async findAll() {
     return this.filesService.findAll();
+  }
+
+  @Roles('admin')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth('access-token')
+  @Delete('by-url')
+  async removeByUrl(@Body('url') url: string) {
+    return this.filesService.removeByUrl(url);
   }
 
   @Roles('admin')
