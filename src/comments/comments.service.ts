@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { Comment, CommentStatus } from 'src/entities/comment.entity';
@@ -23,7 +23,7 @@ export class CommentsService {
 
   async create(dto: CreateCommentDto, userId: number): Promise<Comment> {
     if (!dto.postId && !dto.productId) {
-      throw new BadRequestException('postId یا productId الزامی است');
+      throw new BadRequestException('postId ÛŒØ§ productId Ø§Ù„Ø²Ø§Ù…ÛŒ Ø§Ø³Øª');
     }
 
     const user = await this.usersRepo.findOne({ where: { id: userId } });
@@ -55,6 +55,7 @@ export class CommentsService {
       author: user,
       parent,
       rating: dto.rating ?? null,
+      isAnonymous: dto.isAnonymous ?? false,
     });
 
     return this.commentsRepo.save(comment);
@@ -99,7 +100,7 @@ export class CommentsService {
     };
   }
 
-  /** کامنت‌های تایید‌شده یک محصول */
+  /** Ú©Ø§Ù…Ù†Øªâ€ŒÙ‡Ø§ÛŒ ØªØ§ÛŒÛŒØ¯â€ŒØ´Ø¯Ù‡ ÛŒÚ© Ù…Ø­ØµÙˆÙ„ */
   async findByProduct(
     productId: number,
     page = 1,
@@ -117,7 +118,7 @@ export class CommentsService {
       take: limit,
     });
 
-    // میانگین امتیاز
+    // Ù…ÛŒØ§Ù†Ú¯ÛŒÙ† Ø§Ù…ØªÛŒØ§Ø²
     const ratingResult = await this.commentsRepo
       .createQueryBuilder('c')
       .select('AVG(c.rating)', 'avg')
@@ -157,7 +158,7 @@ export class CommentsService {
     await this.commentsRepo.remove(comment);
   }
 
-  // ─── Admin ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Admin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async findAllAdmin(
     page = 1,
@@ -188,132 +189,6 @@ export class CommentsService {
     const [data, total] = await qb.getManyAndCount();
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
-  }
-
-  async updateStatus(id: number, status: CommentStatus): Promise<Comment> {
-    const comment = await this.findOne(id);
-    comment.status = status;
-    return this.commentsRepo.save(comment);
-  }
-}
-
-
-  async create(dto: CreateCommentDto, userId: number): Promise<Comment> {
-    const post = await this.postsRepo.findOne({ where: { id: dto.postId } });
-    if (!post) throw new NotFoundException('Post not found');
-
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
-
-    let parent: Comment | null = null;
-    if (dto.parentId) {
-      parent = await this.commentsRepo.findOne({ where: { id: dto.parentId } });
-      if (!parent) throw new NotFoundException('Parent comment not found');
-    }
-
-    const comment = this.commentsRepo.create({
-      content: dto.content,
-      post,
-      author: user,
-      parent,
-    });
-
-    // 👇 صراحتاً مشخص می‌کنیم که خروجی یک کامنت تکی هست
-    return this.commentsRepo.save(comment);
-  }
-
-  async findAll(
-    postId: number,
-    page = 1,
-    limit = 10,
-  ): Promise<{ data: Comment[]; total: number; page: number; limit: number }> {
-    const [data, total] = await this.commentsRepo.findAndCount({
-      where: {
-        post: { id: postId },
-        parent: IsNull(),
-        status: CommentStatus.CONFIRMED, // فقط تایید شده‌ها
-      },
-      relations: [
-        'author',
-        'children',
-        'children.author',
-        'children.children',
-        'children.children.author',
-      ],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    // فیلتر children در تمام سطوح فقط confirmed
-    const filterChildren = (comments: Comment[]): Comment[] =>
-      comments
-        .filter((c) => c.status === CommentStatus.CONFIRMED)
-        .map((c) => ({
-          ...c,
-          children: c.children ? filterChildren(c.children) : [],
-        }));
-
-    return {
-      data: filterChildren(data),
-      total,
-      page,
-      limit,
-    };
-  }
-
-  async findOne(id: number): Promise<Comment> {
-    const comment = await this.commentsRepo.findOne({
-      where: { id },
-      relations: ['author', 'post', 'parent', 'children'],
-    });
-    if (!comment) throw new NotFoundException('Comment not found');
-    return comment;
-  }
-
-  async update(id: number, dto: UpdateCommentDto): Promise<Comment> {
-    const comment = await this.findOne(id);
-    if (dto.content !== undefined) comment.content = dto.content;
-    if (dto.status !== undefined) comment.status = dto.status;
-    return this.commentsRepo.save(comment);
-  }
-
-  async remove(id: number): Promise<void> {
-    const comment = await this.findOne(id);
-    await this.commentsRepo.remove(comment);
-  }
-
-  // ─── Admin ─────────────────────────────────────────────────────────────────
-
-  async findAllAdmin(
-    page = 1,
-    limit = 10,
-    status?: CommentStatus,
-  ): Promise<{
-    data: Comment[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  }> {
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-
-    const [data, total] = await this.commentsRepo.findAndCount({
-      where,
-      relations: ['author', 'post'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
   }
 
   async updateStatus(id: number, status: CommentStatus): Promise<Comment> {

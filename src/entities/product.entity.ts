@@ -16,6 +16,8 @@ import { ProductVariantValue } from './product-variant-value.entity';
 import { ProductImage } from './product-image.entity';
 import { SellerOffer } from './seller-offer.entity';
 import { ProductSpecification } from './product-specification.entity';
+import { Comment } from './comment.entity';
+import { ProductSpecValue } from './product-spec-value.entity';
 
 @Entity('products')
 export class Product {
@@ -70,6 +72,12 @@ export class Product {
 
   @OneToMany(() => SellerOffer, (offer) => offer.product)
   offers: SellerOffer[];
+
+  @OneToMany(() => Comment, (comment) => comment.product)
+  comments: Comment[];
+
+  @OneToMany(() => ProductSpecValue, (v) => v.product, { cascade: true })
+  specValues: ProductSpecValue[];
 
   @Column({ default: true })
   isActive: boolean;

@@ -31,4 +31,9 @@ export class CreateCommentDto {
   @IsOptional()
   @IsNumber()
   parentId?: number;
+
+  /** ارسال به عنوان ناشناس */
+  @ApiProperty({ example: false, required: false })
+  @IsOptional()
+  isAnonymous?: boolean;
 }

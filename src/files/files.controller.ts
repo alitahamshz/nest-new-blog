@@ -70,6 +70,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UploadedFile,
   UseInterceptors,
   UseGuards,
@@ -128,8 +129,18 @@ export class FilesController {
   }
 
   @Get()
-  async findAll() {
-    return this.filesService.findAll();
+  async findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('isUsed') isUsed?: string,
+  ) {
+    const isUsedBool =
+      isUsed === 'true' ? true : isUsed === 'false' ? false : undefined;
+    return this.filesService.findAll(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 20,
+      isUsedBool,
+    );
   }
 
   @Roles('admin')

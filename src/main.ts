@@ -66,6 +66,18 @@ async function bootstrap() {
   });
   app.enableCors({
     origin: '*',
+    // origin: (origin, callback) => {
+    //   // اجازه به همه originها (برای dev) یا فقط origin مجاز (برای prod)
+    //   const allowed = process.env.CORS_ORIGIN?.split(',') ?? [];
+    //   if (!origin || allowed.length === 0 || allowed.includes(origin)) {
+    //     callback(null, true);
+    //   } else {
+    //     callback(null, false);
+    //   }
+    // },
+    // methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    // allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    // credentials: true,
   });
 
   const config = new DocumentBuilder()

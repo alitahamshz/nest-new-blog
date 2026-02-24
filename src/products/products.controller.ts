@@ -280,7 +280,23 @@ export class ProductsController {
     @Query('minRating', new ParseIntPipe({ optional: true }))
     minRating?: number,
     @Query('isActive') isActive?: string,
+    @Query() allQuery?: Record<string, any>,
   ) {
+    // NestJS Express از qs extended استفاده نمی‌کند — باید specs[key] را دستی پارس کنیم
+    const specs: Record<string, string> = {};
+    if (allQuery) {
+      // حالت 1: اگر qs extended فعال باشه → allQuery.specs یک object است
+      if (allQuery.specs && typeof allQuery.specs === 'object') {
+        Object.assign(specs, allQuery.specs);
+      }
+      // حالت 2: qs ساده — specs[rgb] به صورت کلید flat ارسال می‌شود
+      for (const [key, value] of Object.entries(allQuery)) {
+        const match = key.match(/^specs\[(.+)\]$/);
+        if (match && typeof value === 'string') {
+          specs[match[1]] = value;
+        }
+      }
+    }
     const filterDto: FilterProductsDto = {
       page: page || 1,
       limit: limit || 10,
@@ -312,6 +328,7 @@ export class ProductsController {
       sortBy: sortBy || SortBy.NEWEST,
       minRating,
       isActive: isActive === 'false' ? false : true,
+      specs: Object.keys(specs).length > 0 ? specs : undefined,
     };
 
     return this.productsService.findAllWithFilters(filterDto);

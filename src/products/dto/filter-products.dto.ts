@@ -105,4 +105,10 @@ export class FilterProductsDto {
   @Type(() => Boolean)
   @IsBoolean()
   hasWarrantyOnly?: boolean;
+
+  // فیلتر ویژگی‌های دسته‌بندی
+  // فرمت: specs[screen_size]=6-7&specs[brand]=Samsung,Apple
+  // مقدار عددی با - بازه است، چند مقدار با , جدا میشن
+  @IsOptional()
+  specs?: Record<string, string>;
 }

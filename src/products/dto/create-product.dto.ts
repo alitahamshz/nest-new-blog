@@ -6,9 +6,18 @@ import {
   IsArray,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CreateProductSpecificationDto } from '../../product-specification/dto';
+
+export class ProductSpecValueInputDto {
+  @ApiProperty({ description: 'شناسه قالب ویژگی' })
+  @IsNumber()
+  templateId: number;
+
+  @ApiProperty({ description: 'مقدار ویژگی', example: '6.7' })
+  value: string | number | boolean;
+}
 
 export class CreateProductDto {
   @ApiProperty({ description: 'نام محصول' })
@@ -76,4 +85,14 @@ export class CreateProductDto {
   @IsArray()
   @IsOptional()
   galleryUrls?: string[];
+
+  @ApiPropertyOptional({
+    description: 'مقادیر ویژگی‌های دسته‌بندی (category spec values)',
+    type: [ProductSpecValueInputDto],
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProductSpecValueInputDto)
+  specValues?: ProductSpecValueInputDto[];
 }

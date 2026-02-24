@@ -26,6 +26,8 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentModule } from './payments/payment.module';
 import { BannersModule } from './banners/banners.module';
 import { PromoBannersModule } from './promo-banners/promo-banners.module';
+import { AiModule } from './ai/ai.module';
+import { CategorySpecTemplateModule } from './category-spec-template/category-spec-template.module';
 
 @Module({
   imports: [
@@ -65,6 +67,8 @@ import { PromoBannersModule } from './promo-banners/promo-banners.module';
     PaymentModule,
     BannersModule,
     PromoBannersModule,
+    AiModule,
+    CategorySpecTemplateModule,
   ],
   controllers: [AppController],
   providers: [AppService],

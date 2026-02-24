@@ -10,6 +10,7 @@ import { ProductCategory } from '../entities/product-category.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductImage } from '../entities/product-image.entity';
 import { ProductSpecification } from '../entities/product-specification.entity';
+import { ProductSpecValue } from '../entities/product-spec-value.entity';
 import { Tag } from '../entities/tag.entity';
 import { SellerOffer } from '../entities/seller-offer.entity';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -34,6 +35,8 @@ export class ProductsService {
     private readonly specificationRepo: Repository<ProductSpecification>,
     @InjectRepository(SellerOffer)
     private readonly offerRepo: Repository<SellerOffer>,
+    @InjectRepository(ProductSpecValue)
+    private readonly specValueRepo: Repository<ProductSpecValue>,
   ) {}
 
   /**
@@ -94,6 +97,18 @@ export class ProductsService {
         }),
       );
       await this.specificationRepo.save(specifications);
+    }
+
+    // اضافه کردن category spec values
+    if (createDto.specValues && createDto.specValues.length > 0) {
+      const specValues = createDto.specValues.map((sv) =>
+        this.specValueRepo.create({
+          productId: savedProduct.id,
+          templateId: sv.templateId,
+          value: String(sv.value),
+        }),
+      );
+      await this.specValueRepo.save(specValues);
     }
 
     // اضافه کردن gallery images
@@ -163,6 +178,55 @@ export class ProductsService {
       .leftJoinAndSelect('variants.values', 'variantValues')
       .innerJoinAndSelect('product.offers', 'offers')
       .innerJoinAndSelect('offers.seller', 'seller');
+
+    // فیلتر: ویژگی‌های دسته‌بندی (specs)
+    if (filterDto.specs && Object.keys(filterDto.specs).length > 0) {
+      let specIdx = 0;
+      for (const [key, rawValue] of Object.entries(filterDto.specs)) {
+        const alias = `sv${specIdx}`;
+        const tAlias = `svt${specIdx}`;
+        query
+          .innerJoin('product.specValues', alias)
+          .innerJoin(`${alias}.template`, tAlias);
+        query.andWhere(`${tAlias}.key = :specKey${specIdx}`, {
+          [`specKey${specIdx}`]: key,
+        });
+
+        if (rawValue.includes('-') && !rawValue.includes(',')) {
+          // بررسی بازه عددی: فقط اگر هر دو طرف خط تیره عدد باشند
+          const parts = rawValue.split('-');
+          const isNumericRange =
+            parts.length === 2 &&
+            !isNaN(parseFloat(parts[0])) &&
+            !isNaN(parseFloat(parts[1]));
+
+          if (isNumericRange) {
+            // بازه عددی: "6-7"
+            query.andWhere(
+              `CAST(${alias}.value AS DECIMAL) BETWEEN :specMin${specIdx} AND :specMax${specIdx}`,
+              { [`specMin${specIdx}`]: parseFloat(parts[0]), [`specMax${specIdx}`]: parseFloat(parts[1]) },
+            );
+          } else {
+            // مقدار دقیق شامل خط تیره (مثلاً "semi-mechanical")
+            query.andWhere(`${alias}.value = :specVal${specIdx}`, {
+              [`specVal${specIdx}`]: rawValue,
+            });
+          }
+        } else if (rawValue.includes(',')) {
+          // چند مقدار: "Samsung,Apple"
+          const vals = rawValue.split(',').map((v) => v.trim());
+          query.andWhere(`${alias}.value IN (:...specVals${specIdx})`, {
+            [`specVals${specIdx}`]: vals,
+          });
+        } else {
+          // مقدار دقیق
+          query.andWhere(`${alias}.value = :specVal${specIdx}`, {
+            [`specVal${specIdx}`]: rawValue,
+          });
+        }
+        specIdx++;
+      }
+    }
 
     // فیلتر: جستجو در نام و sku
     if (filterDto.search) {
@@ -287,22 +351,22 @@ export class ProductsService {
     // ترتیب نتایج
     switch (filterDto.sortBy) {
       case SortBy.PRICE_LOW:
-        // کارنترین قیمت
-        query.orderBy(
-          'CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END',
-          'ASC',
-        );
+      case SortBy.PRICE_HIGH: {
+        // مرتب‌سازی بر اساس قیمت مؤثر (کف قیمت) هر محصول
+        // از addSelect با correlated subquery و alias کوچک (lowercase) استفاده می‌کنیم
+        // تا PostgreSQL بدون نیاز به double-quote آن را پیدا کند
+        const dir = filterDto.sortBy === SortBy.PRICE_LOW ? 'ASC' : 'DESC';
+        query.addSelect((subQuery) => {
+          return subQuery
+            .select('MIN(CASE WHEN so.discountPrice > 0 THEN so.discountPrice ELSE so.price END)')
+            .from(SellerOffer, 'so')
+            .where('so.productId = product.id')
+            .andWhere('so.isActive = true');
+        }, 'effectiveprice');
+        query.orderBy('effectiveprice', dir);
         query.addOrderBy('product.createdAt', 'DESC');
         break;
-
-      case SortBy.PRICE_HIGH:
-        // گران‌ترین قیمت
-        query.orderBy(
-          'CASE WHEN offers.discountPrice > 0 THEN offers.discountPrice ELSE offers.price END',
-          'DESC',
-        );
-        query.addOrderBy('product.createdAt', 'DESC');
-        break;
+      }
 
       case SortBy.DISCOUNT:
         // بیشترین تخفیف
@@ -463,6 +527,8 @@ export class ProductsService {
         'category',
         'tags',
         'specifications',
+        'specValues',
+        'specValues.template',
         'gallery',
         'variants',
         'variants.values',
@@ -492,6 +558,8 @@ export class ProductsService {
       .leftJoinAndSelect('product.tags', 'tags')
       .leftJoinAndSelect('product.specifications', 'specifications')
       .leftJoinAndSelect('product.gallery', 'gallery')
+      .leftJoinAndSelect('product.specValues', 'specValues')
+      .leftJoinAndSelect('specValues.template', 'specTemplate')
       .leftJoinAndSelect('product.variants', 'variants')
       .leftJoinAndSelect('variants.values', 'variantValues')
       .leftJoinAndSelect('product.variantValues', 'productVariantValues')
@@ -595,6 +663,21 @@ export class ProductsService {
           }),
         );
         await this.specificationRepo.save(specifications);
+      }
+    }
+
+    // بروزرسانی category spec values
+    if (updateDto.specValues !== undefined) {
+      await this.specValueRepo.delete({ productId: id });
+      if (updateDto.specValues.length > 0) {
+        const specValues = updateDto.specValues.map((sv) =>
+          this.specValueRepo.create({
+            productId: id,
+            templateId: sv.templateId,
+            value: String(sv.value),
+          }),
+        );
+        await this.specValueRepo.save(specValues);
       }
     }
 

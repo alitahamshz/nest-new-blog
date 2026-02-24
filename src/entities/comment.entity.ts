@@ -20,50 +20,54 @@ export enum CommentStatus {
 @Entity()
 export class Comment {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column('text')
-  content: string;
+  content!: string;
 
   @Column({
     type: 'enum',
     enum: CommentStatus,
     default: CommentStatus.PENDING,
   })
-  status: CommentStatus;
+  status!: CommentStatus;
 
   /** امتیاز (۱ تا ۵) — اختیاری */
   @Column({ type: 'smallint', nullable: true, default: null })
-  rating: number | null;
+  rating!: number | null;
+
+  /** نمایش به عنوان ناشناس */
+  @Column({ default: false })
+  isAnonymous!: boolean;
 
   // کاربری که کامنت گذاشته
   @ManyToOne(() => User, (user) => user.comments, { onDelete: 'CASCADE' })
-  author: User;
+  author!: User;
 
   // پست مربوطه (nullable برای کامنت محصول)
   @ManyToOne(() => Post, (post) => post.comments, {
     onDelete: 'CASCADE',
     nullable: true,
   })
-  post: Post | null;
+  post!: Post | null;
 
   // محصول مربوطه (nullable برای کامنت پست)
-  @ManyToOne(() => Product, { onDelete: 'CASCADE', nullable: true })
-  product: Product | null;
+  @ManyToOne(() => Product, (product) => product.comments, { onDelete: 'CASCADE', nullable: true })
+  product!: Product | null;
 
   // برای پاسخ‌ها (self relation)
   @ManyToOne(() => Comment, (comment) => comment.children, {
     nullable: true,
     onDelete: 'CASCADE',
   })
-  parent: Comment | null;
+  parent!: Comment | null;
 
   @OneToMany(() => Comment, (comment) => comment.parent)
-  children: Comment[];
+  children!: Comment[];
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }

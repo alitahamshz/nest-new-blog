@@ -54,16 +54,27 @@
 
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { FileEntity } from '../entities/file.entity';
 import { unlinkSync } from 'fs';
 import { join } from 'path';
+
+export type FileWithUsage = FileEntity & { isUsed: boolean };
+
+export interface PaginatedFiles {
+  data: FileWithUsage[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
 @Injectable()
 export class FilesService {
   constructor(
     @InjectRepository(FileEntity)
     private readonly fileRepository: Repository<FileEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async saveFile(
@@ -108,10 +119,77 @@ export class FilesService {
     return this.fileRepository.save(newFile);
   }
 
-  async findAll(): Promise<FileEntity[]> {
-    return this.fileRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  private readonly USED_URLS_SUBQUERY = `
+    SELECT url FROM (
+      SELECT thumbnail   AS url FROM posts                     WHERE thumbnail   IS NOT NULL
+      UNION
+      SELECT cover_image AS url FROM posts                     WHERE cover_image IS NOT NULL
+      UNION
+      SELECT "mainImage" AS url FROM products                  WHERE "mainImage" IS NOT NULL
+      UNION
+      SELECT url                FROM product_images
+      UNION
+      SELECT image       AS url FROM product_variants          WHERE image       IS NOT NULL
+      UNION
+      SELECT image       AS url FROM product_variant_values    WHERE image       IS NOT NULL
+    ) AS t
+  `;
+
+  async findAll(
+    page = 1,
+    limit = 20,
+    isUsed?: boolean,
+  ): Promise<PaginatedFiles> {
+    const skip = (page - 1) * limit;
+
+    if (isUsed === undefined) {
+      // بدون فیلتر — همه فایل‌ها + annotate isUsed
+      const [files, total] = await this.fileRepository.findAndCount({
+        order: { createdAt: 'DESC' },
+        skip,
+        take: limit,
+      });
+
+      if (files.length === 0) {
+        return { data: [], total, page, limit, totalPages: 0 };
+      }
+
+      const urls = files.map((f) => f.url);
+      const usedRows = await this.dataSource.query<{ url: string }[]>(
+        `SELECT DISTINCT url FROM (${this.USED_URLS_SUBQUERY}) AS all_used WHERE url = ANY($1)`,
+        [urls],
+      );
+      const usedSet = new Set(usedRows.map((r) => r.url));
+
+      return {
+        data: files.map((f) => ({ ...f, isUsed: usedSet.has(f.url) })),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    // فیلتر بر اساس isUsed
+    const inOrNot = isUsed ? 'IN' : 'NOT IN';
+    const countResult = await this.dataSource.query<[{ count: string }]>(
+      `SELECT COUNT(*) FROM files WHERE url ${inOrNot} (${this.USED_URLS_SUBQUERY})`,
+    );
+    const total = parseInt(countResult[0].count, 10);
+
+    const rows = await this.dataSource.query<FileEntity[]>(
+      `SELECT * FROM files WHERE url ${inOrNot} (${this.USED_URLS_SUBQUERY})
+       ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2`,
+      [limit, skip],
+    );
+
+    return {
+      data: rows.map((f) => ({ ...f, isUsed })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async remove(id: number): Promise<{ message: 'File deleted successfully' }> {
@@ -120,14 +198,23 @@ export class FilesService {
       throw new NotFoundException('File not found');
     }
 
-    const uploadPathBase = process.env.UPLOADS_DESTINATION || '/app/uploads';
-    const fullPath = join(uploadPathBase, file.path);
+    // اگر path با "uploads/" شروع شه، فایل لوکال است (saveFileLocal)
+    // پس مسیر واقعی = process.cwd() + path
+    // اگر نه، فایل داکر است (saveFile) = UPLOADS_DESTINATION + path
+    let fullPath: string;
+    if (file.path.startsWith('uploads/') || file.path.startsWith('uploads\\')) {
+      fullPath = join(process.cwd(), file.path);
+    } else {
+      const uploadPathBase = process.env.UPLOADS_DESTINATION || '/app/uploads';
+      fullPath = join(uploadPathBase, file.path);
+    }
 
     try {
       unlinkSync(fullPath);
     } catch (err) {
+      // لاگ کن ولی ادامه بده تا رکورد از DB حذف بشه
       console.error(
-        'File delete error:',
+        `File delete error [${fullPath}]:`,
         err instanceof Error ? err.message : String(err),
       );
     }
