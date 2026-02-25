@@ -40,9 +40,16 @@ export class CommentsController {
   }
 
   @Get()
+  @ApiQuery({ name: 'postId', required: true, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @UseInterceptors(ClassSerializerInterceptor)
-  findAll(@Query('postId') postId: number) {
-    return this.commentsService.findAll(Number(postId));
+  findAll(
+    @Query('postId') postId: number,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
+  ) {
+    return this.commentsService.findAll(Number(postId), Number(page), Number(limit));
   }
 
   /** دریافت کامنت‌های تایید‌شده یک محصول */
