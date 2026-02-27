@@ -410,6 +410,24 @@ export class ProductsController {
     return await this.productsService.findByCategory(+categoryId);
   }
 
+  @Get('category/:categoryId/latest')
+  @ApiOperation({ summary: 'دریافت آخرین محصولات یک دسته‌بندی (برای اسلایدر صفحه اصلی)' })
+  @ApiParam({ name: 'categoryId', description: 'شناسه دسته‌بندی' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'تعداد محصولات (پیش‌فرض: 10)',
+    example: 10,
+    type: 'integer',
+  })
+  @ApiResponse({ status: 200 })
+  async findLatestByCategory(
+    @Param('categoryId') categoryId: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return await this.productsService.findLatestByCategory(+categoryId, limit || 10);
+  }
+
   @Get('tag/:tagId')
   @ApiOperation({ summary: 'دریافت محصولات با تگ خاص' })
   @ApiParam({ name: 'tagId', description: 'شناسه تگ' })
@@ -419,6 +437,39 @@ export class ProductsController {
   })
   async findByTag(@Param('tagId') tagId: string) {
     return await this.productsService.findByTag(+tagId);
+  }
+
+  @Get('best-sellers')
+  @ApiOperation({ summary: 'دریافت پرفروش‌ترین محصولات بر اساس سفارشات' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'تعداد محصولات (پیش‌فرض: 15)',
+    example: 15,
+    type: 'integer',
+  })
+  @ApiResponse({ status: 200, description: 'لیست پرفروش‌ترین‌ها' })
+  async findBestSellers(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    return await this.productsService.findBestSellers(limit || 15);
+  }
+
+  @Get('by-ids')
+  @ApiOperation({ summary: 'دریافت تعدادی محصول با آرایه شناسه (برای صفحه اصلی)' })
+  @ApiQuery({
+    name: 'ids',
+    required: true,
+    description: 'شناسه‌های محصول با کاما جدا شده — مثال: 1,2,3',
+    example: '1,2,3',
+  })
+  @ApiResponse({ status: 200 })
+  async findByIds(@Query('ids') ids: string) {
+    const idList = (ids || '')
+      .split(',')
+      .map((s) => parseInt(s.trim(), 10))
+      .filter((n) => !isNaN(n));
+    return await this.productsService.findByIds(idList);
   }
 
   @Get('slug/:slug')

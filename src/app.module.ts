@@ -28,6 +28,8 @@ import { BannersModule } from './banners/banners.module';
 import { PromoBannersModule } from './promo-banners/promo-banners.module';
 import { AiModule } from './ai/ai.module';
 import { CategorySpecTemplateModule } from './category-spec-template/category-spec-template.module';
+import { SettingsModule } from './settings/settings.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -69,6 +71,8 @@ import { CategorySpecTemplateModule } from './category-spec-template/category-sp
     PromoBannersModule,
     AiModule,
     CategorySpecTemplateModule,
+    SettingsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

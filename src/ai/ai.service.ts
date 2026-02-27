@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { GeneratePostDto, PostTone } from './dto/generate-post.dto';
+import { SettingsService } from '../settings/settings.service';
 
 const TONE_MAP: Record<PostTone, string> = {
   [PostTone.FORMAL]: 'رسمی و حرفه‌ای',
@@ -12,13 +13,34 @@ const TONE_MAP: Record<PostTone, string> = {
 
 @Injectable()
 export class AiService {
-  private readonly client: OpenAI;
+  private client: OpenAI;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settingsService: SettingsService,
+  ) {
     this.client = new OpenAI({
       baseURL: 'https://models.inference.ai.azure.com',
       apiKey: this.config.get<string>('GITHUB_TOKEN'),
     });
+  }
+
+  /** بازسازی کلاینت با توکن از تنظیمات (در صورت وجود) */
+  private async getClient(): Promise<OpenAI> {
+    const dbToken = await this.settingsService.getValue('ai.github_token');
+    if (dbToken) {
+      return new OpenAI({
+        baseURL: 'https://models.inference.ai.azure.com',
+        apiKey: dbToken,
+      });
+    }
+    return this.client;
+  }
+
+  /** دریافت مدل از تنظیمات */
+  private async getModel(): Promise<string> {
+    const model = await this.settingsService.getValue('ai.model');
+    return model || 'gpt-4o-mini';
   }
 
   async generatePost(dto: GeneratePostDto): Promise<{
@@ -56,8 +78,11 @@ export class AiService {
 باشد. طول محتوا حداقل 1200 کلمه.`;
 
     try {
-      const response = await this.client.chat.completions.create({
-        model: 'gpt-4o-mini',
+      const client = await this.getClient();
+      const model = await this.getModel();
+
+      const response = await client.chat.completions.create({
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

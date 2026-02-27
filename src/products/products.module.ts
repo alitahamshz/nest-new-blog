@@ -10,6 +10,7 @@ import { ProductImage } from 'src/entities/product-image.entity';
 import { ProductSpecification } from 'src/entities/product-specification.entity';
 import { SellerOffer } from 'src/entities/seller-offer.entity';
 import { ProductSpecValue } from 'src/entities/product-spec-value.entity';
+import { OrderItem } from 'src/entities/order-item.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ProductSpecValue } from 'src/entities/product-spec-value.entity';
       ProductSpecification,
       SellerOffer,
       ProductSpecValue,
+      OrderItem,
     ]),
   ],
   controllers: [ProductsController],

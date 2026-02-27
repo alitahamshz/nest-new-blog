@@ -7,6 +7,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
+import { OrderItem } from '../entities/order-item.entity';
+import { Order } from '../entities/order.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductImage } from '../entities/product-image.entity';
 import { ProductSpecification } from '../entities/product-specification.entity';
@@ -37,6 +39,8 @@ export class ProductsService {
     private readonly offerRepo: Repository<SellerOffer>,
     @InjectRepository(ProductSpecValue)
     private readonly specValueRepo: Repository<ProductSpecValue>,
+    @InjectRepository(OrderItem)
+    private readonly orderItemRepo: Repository<OrderItem>,
   ) {}
 
   /**
@@ -932,6 +936,187 @@ export class ProductsService {
         total: categoriesWithPath.length,
       },
     };
+  }
+
+  /**
+   * دریافت لیست محصولات با آرایه شناسه‌ها (برای بخش‌های صفحه اصلی فروشگاه)
+   */
+  /**
+   * پرفروش‌ترین محصولات بر اساس مجموع تعداد سفارشات پرداخت‌شده
+   */
+  async findBestSellers(limit: number = 15): Promise<
+    {
+      id: number;
+      name: string;
+      slug: string;
+      mainImage: string | null;
+      minPrice: number | undefined;
+      maxPrice: number | undefined;
+      discount: number | undefined;
+      offerCount: number;
+      totalSold: number;
+    }[]
+  > {
+    // مرحله ۱: پیدا کردن پرفروش‌ترین product IDs از order_items
+    const bestSellerRows = await this.orderItemRepo
+      .createQueryBuilder('oi')
+      .innerJoin('oi.order', 'o')
+      .innerJoin('oi.product', 'p')
+      .where('o.status IN (:...statuses)', {
+        statuses: ['paid', 'processing', 'shipped', 'delivered'],
+      })
+      .andWhere('p.isActive = :active', { active: true })
+      .select('p.id', 'productId')
+      .addSelect('SUM(oi.quantity)', 'totalSold')
+      .groupBy('p.id')
+      .orderBy('"totalSold"', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    if (!bestSellerRows.length) return [];
+
+    const ids = bestSellerRows.map((r) => Number(r.productId));
+    const soldMap = new Map<number, number>();
+    bestSellerRows.forEach((r) => soldMap.set(Number(r.productId), Number(r.totalSold)));
+
+    // مرحله ۲: اطلاعات کامل محصولات
+    const products = await this.productRepo.find({
+      where: { id: In(ids), isActive: true },
+      relations: ['offers'],
+    });
+
+    return ids
+      .map((id) => {
+        const product = products.find((p) => p.id === id);
+        if (!product) return null;
+        const prices = product.offers.map((o) =>
+          o.discountPrice && o.discountPrice > 0 ? o.discountPrice : o.price,
+        );
+        const originalPrices = product.offers.map((o) => o.price);
+        const minPrice = prices.length > 0 ? Math.min(...prices) : undefined;
+        const maxOriginal = originalPrices.length > 0 ? Math.max(...originalPrices) : undefined;
+        const discount =
+          minPrice && maxOriginal && maxOriginal > minPrice
+            ? Math.round(((maxOriginal - minPrice) / maxOriginal) * 100)
+            : undefined;
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          mainImage: product.mainImage,
+          minPrice,
+          maxPrice: originalPrices.length > 0 ? Math.max(...originalPrices) : undefined,
+          discount,
+          offerCount: product.offers.length,
+          totalSold: soldMap.get(id) || 0,
+        };
+      })
+      .filter(Boolean) as any;
+  }
+
+  /**
+   * آخرین محصولات یک دسته‌بندی (شامل زیرشاخه‌ها) — برای اسلایدر صفحه اصلی
+   */
+  async findLatestByCategory(
+    categoryId: number,
+    limit: number = 10,
+  ): Promise<
+    {
+      id: number;
+      name: string;
+      slug: string;
+      mainImage: string | null;
+      minPrice: number | undefined;
+      maxPrice: number | undefined;
+      discount: number | undefined;
+      offerCount: number;
+    }[]
+  > {
+    const categoryIds = await this.getAllDescendantCategoryIds(categoryId);
+
+    const products = await this.productRepo
+      .createQueryBuilder('product')
+      .innerJoinAndSelect('product.offers', 'offers')
+      .where('product.categoryId IN (:...categoryIds)', { categoryIds })
+      .andWhere('product.isActive = :isActive', { isActive: true })
+      .orderBy('product.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+
+    return products.map((product) => {
+      const prices = product.offers.map((o) =>
+        o.discountPrice && o.discountPrice > 0 ? o.discountPrice : o.price,
+      );
+      const originalPrices = product.offers.map((o) => o.price);
+      const minPrice = prices.length > 0 ? Math.min(...prices) : undefined;
+      const maxOriginal = originalPrices.length > 0 ? Math.max(...originalPrices) : undefined;
+      const discount =
+        minPrice && maxOriginal && maxOriginal > minPrice
+          ? Math.round(((maxOriginal - minPrice) / maxOriginal) * 100)
+          : undefined;
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        mainImage: product.mainImage,
+        minPrice,
+        maxPrice: originalPrices.length > 0 ? Math.max(...originalPrices) : undefined,
+        discount,
+        offerCount: product.offers.length,
+      };
+    });
+  }
+
+  async findByIds(ids: number[]): Promise<
+    {
+      id: number;
+      name: string;
+      slug: string;
+      mainImage: string | null;
+      minPrice: number | undefined;
+      maxPrice: number | undefined;
+      discount: number | undefined;
+      offerCount: number;
+    }[]
+  > {
+    if (!ids.length) return [];
+
+    const products = await this.productRepo.find({
+      where: { id: In(ids), isActive: true },
+      relations: ['offers'],
+    });
+
+    const result = products.map((product) => {
+      const prices = product.offers.map((o) =>
+        o.discountPrice && o.discountPrice > 0 ? o.discountPrice : o.price,
+      );
+      const originalPrices = product.offers.map((o) => o.price);
+      const minPrice =
+        prices.length > 0 ? Math.min(...prices) : undefined;
+      const maxOriginal =
+        originalPrices.length > 0 ? Math.max(...originalPrices) : undefined;
+      const discount =
+        minPrice && maxOriginal && maxOriginal > minPrice
+          ? Math.round(((maxOriginal - minPrice) / maxOriginal) * 100)
+          : undefined;
+
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        mainImage: product.mainImage,
+        minPrice,
+        maxPrice:
+          originalPrices.length > 0 ? Math.max(...originalPrices) : undefined,
+        discount,
+        offerCount: product.offers.length,
+      };
+    });
+
+    // ترتیب را مطابق آرایه ids حفظ کن
+    return ids
+      .map((id) => result.find((p) => p.id === id))
+      .filter(Boolean) as typeof result;
   }
 
   /**
