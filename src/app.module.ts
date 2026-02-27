@@ -45,7 +45,13 @@ import { DashboardModule } from './dashboard/dashboard.module';
       password: process.env.DB_PASS,
       database: process.env.DB_NAME,
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: process.env.NODE_ENV !== 'production',
+      migrationsRun: process.env.NODE_ENV === 'production',
+      migrations: [
+        process.env.NODE_ENV === 'production'
+          ? 'dist/src/migrations/*.js'
+          : 'src/migrations/*.ts',
+      ],
     }),
     PostsModule,
     CategoryModule,
