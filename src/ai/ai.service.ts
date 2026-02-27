@@ -13,16 +13,19 @@ const TONE_MAP: Record<PostTone, string> = {
 
 @Injectable()
 export class AiService {
-  private client: OpenAI;
+  private client: OpenAI | null = null;
 
   constructor(
     private readonly config: ConfigService,
     private readonly settingsService: SettingsService,
   ) {
-    this.client = new OpenAI({
-      baseURL: 'https://models.inference.ai.azure.com',
-      apiKey: this.config.get<string>('GITHUB_TOKEN'),
-    });
+    const token = this.config.get<string>('GITHUB_TOKEN');
+    if (token) {
+      this.client = new OpenAI({
+        baseURL: 'https://models.inference.ai.azure.com',
+        apiKey: token,
+      });
+    }
   }
 
   /** بازسازی کلاینت با توکن از تنظیمات (در صورت وجود) */
@@ -33,6 +36,11 @@ export class AiService {
         baseURL: 'https://models.inference.ai.azure.com',
         apiKey: dbToken,
       });
+    }
+    if (!this.client) {
+      throw new InternalServerErrorException(
+        'AI is not configured. Set GITHUB_TOKEN env or ai.github_token in settings.',
+      );
     }
     return this.client;
   }
